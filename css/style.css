@@ -1,0 +1,338 @@
+/* ===========================
+   Tradexor Stock Market Web App
+   Custom CSS Styles
+   Theme: White + Orange
+   =========================== */
+
+/* --- CSS Variables (Color Palette) --- */
+:root {
+  --primary: #ff7a00; /* Main orange color */
+  --primary-light: #fff3e6; /* Light orange background */
+  --primary-hover: #e06d00; /* Darker orange for hover */
+  --text-dark: #222222; /* Main text color */
+  --positive: #28a745; /* Green for positive stocks */
+  --negative: #dc3545; /* Red for negative stocks */
+  --bg-white: #ffffff; /* Background white */
+  --border: #e0e0e0; /* Light border color */
+  --gray-light: #f8f9fa; /* Light gray for sections */
+}
+
+/* --- General Body Styles --- */
+body {
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  background-color: var(--bg-white);
+  color: var(--text-dark);
+  min-height: 100vh;
+}
+
+/* --- Navbar Styles --- */
+.navbar {
+  background-color: var(--bg-white);
+  border-bottom: 2px solid var(--primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.navbar-brand {
+  color: var(--primary) !important;
+  font-weight: 700;
+  font-size: 1.5rem;
+}
+
+.nav-link {
+  color: var(--text-dark) !important;
+  font-weight: 500;
+  padding: 8px 16px !important;
+  border-radius: 8px;
+  transition: background-color 0.2s;
+}
+
+.nav-link:hover {
+  color: var(--primary) !important;
+  background-color: var(--primary-light);
+}
+
+.nav-link.active {
+  color: var(--primary) !important;
+  font-weight: 600;
+}
+
+/* --- Orange Buttons (Override Bootstrap) --- */
+.btn-primary,
+.btn-orange {
+  background-color: var(--primary) !important;
+  border-color: var(--primary) !important;
+  color: #fff !important;
+}
+
+.btn-primary:hover,
+.btn-orange:hover {
+  background-color: var(--primary-hover) !important;
+  border-color: var(--primary-hover) !important;
+}
+
+.btn-outline-primary,
+.btn-outline-orange {
+  color: var(--primary) !important;
+  border-color: var(--primary) !important;
+  background-color: transparent !important;
+}
+
+.btn-outline-primary:hover,
+.btn-outline-orange:hover {
+  background-color: var(--primary) !important;
+  color: #fff !important;
+}
+
+/* --- Hero Section (Home Page) --- */
+.hero {
+  background: linear-gradient(135deg, var(--primary-light), var(--bg-white));
+  padding: 60px 0;
+  text-align: center;
+}
+
+.hero h1 {
+  color: var(--primary);
+  font-weight: 700;
+  font-size: 2.5rem;
+}
+
+.hero p {
+  color: var(--text-dark);
+  font-size: 1.1rem;
+}
+
+/* --- Section Titles --- */
+.section-title {
+  color: var(--primary);
+  font-weight: 700;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid var(--primary-light);
+}
+
+/* --- Stock Cards --- */
+.stock-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 15px;
+  background: var(--bg-white);
+  transition:
+    box-shadow 0.2s,
+    transform 0.2s;
+}
+
+.stock-card:hover {
+  box-shadow: 0 4px 16px rgba(255, 122, 0, 0.15);
+  transform: translateY(-2px);
+}
+
+.stock-card.clickable {
+  cursor: pointer;
+  border-left: 4px solid var(--primary);
+}
+
+/* --- Price Colors (Green = Up, Red = Down) --- */
+.price-up {
+  color: var(--positive);
+  font-weight: 600;
+}
+
+.price-down {
+  color: var(--negative);
+  font-weight: 600;
+}
+
+/* --- Chart Container --- */
+.chart-container {
+  background: var(--bg-white);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+/* --- Time Period Buttons --- */
+.time-btn {
+  margin: 3px;
+  min-width: 50px;
+}
+
+.time-btn.active {
+  background-color: var(--primary) !important;
+  color: #fff !important;
+  border-color: var(--primary) !important;
+}
+
+/* --- News Cards --- */
+.news-card {
+  border-left: 4px solid var(--primary);
+  padding: 15px 20px;
+  margin-bottom: 12px;
+  background: var(--primary-light);
+  border-radius: 0 8px 8px 0;
+}
+
+.news-card h6 {
+  margin-bottom: 5px;
+}
+
+.news-card small {
+  color: #666;
+}
+
+/* --- Table with Orange Header --- */
+.table-orange thead {
+  background-color: var(--primary);
+  color: #fff;
+}
+
+.table-orange thead th {
+  border: none;
+  font-weight: 600;
+}
+
+/* --- Login Card --- */
+.login-card {
+  max-width: 460px;
+  margin: 50px auto;
+  padding: 35px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.login-card h3 {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+/* --- Portfolio Summary --- */
+.portfolio-summary {
+  background: var(--primary-light);
+  border-radius: 12px;
+  padding: 25px;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.portfolio-value {
+  font-size: 2.2rem;
+  color: var(--primary);
+  font-weight: 700;
+}
+
+/* --- Pro / Pricing Card --- */
+.pro-card {
+  border: 2px solid var(--primary);
+  border-radius: 16px;
+  padding: 35px;
+  text-align: center;
+  background: var(--primary-light);
+  max-width: 400px;
+  margin: 30px auto;
+}
+
+.pro-price {
+  font-size: 2.8rem;
+  color: var(--primary);
+  font-weight: 700;
+}
+
+/* --- Search Box --- */
+.search-box {
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.search-box .form-control:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 0.2rem rgba(255, 122, 0, 0.25);
+}
+
+/* --- Location Badge --- */
+.location-badge {
+  background: var(--primary-light);
+  color: var(--primary);
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  display: inline-block;
+}
+
+/* --- Footer --- */
+footer {
+  background-color: var(--primary-light);
+  padding: 20px 0;
+  text-align: center;
+  margin-top: 50px;
+  color: var(--text-dark);
+  border-top: 1px solid var(--border);
+}
+
+/* --- Badge Override --- */
+.badge-orange {
+  background-color: var(--primary);
+  color: #fff;
+}
+
+/* --- Responsive Adjustments --- */
+@media (max-width: 768px) {
+  .hero {
+    padding: 30px 15px;
+  }
+
+  .hero h1 {
+    font-size: 1.6rem;
+  }
+
+  .stock-card {
+    padding: 15px;
+  }
+
+  .pro-card {
+    margin: 15px;
+    padding: 25px;
+  }
+
+  .login-card {
+    margin: 20px;
+    padding: 25px;
+  }
+
+  .portfolio-value {
+    font-size: 1.8rem;
+  }
+}
+
+/* Keep charts bounded on both desktop and mobile. */
+.chart-container {
+  height: 340px;
+}
+.stock-card small {
+  overflow-wrap: anywhere;
+}
+#portfolioChart {
+  max-height: 300px;
+}
+
+.stock-card h5 {
+  color: var(--primary);
+}
+.stock-card h4 {
+  color: var(--text-dark);
+}
+
+
+/* ===== SoleStyle e-commerce additions ===== */
+.product-card { border:1px solid var(--border); border-radius:12px; overflow:hidden; height:100%; background:#fff; transition:.2s; }
+.product-card:hover { box-shadow:0 4px 16px rgba(255,122,0,.15); transform:translateY(-2px); }
+.product-image { width:100%; height:190px; object-fit:cover; background:var(--gray-light); }
+.product-card .card-body { padding:18px; }
+.price { color:var(--primary); font-size:1.25rem; font-weight:700; }
+.category-card { height:100%; padding:24px; border:1px solid var(--border); border-radius:12px; background:#fff; }
+.category-icon { font-size:2rem; }
+.cart-count { background:var(--primary); color:#fff; border-radius:20px; padding:2px 7px; font-size:.75rem; }
+.empty-state { padding:45px 20px; text-align:center; background:var(--gray-light); border-radius:12px; }
+.form-control:focus,.form-select:focus { border-color:var(--primary); box-shadow:0 0 0 .2rem rgba(255,122,0,.15); }
+.order-summary { background:var(--primary-light); border-radius:12px; padding:20px; }
