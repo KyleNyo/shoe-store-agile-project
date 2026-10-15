@@ -1,3 +1,5 @@
+> Historical pre-merge record. PR #1 has since been merged and tested. See [CURRENT-STATUS.md](CURRENT-STATUS.md) for the latest status and safe recovery procedure.
+
 # Sprint 2 — Team Review and Demo
 
 PR: https://github.com/KyleNyo/shoe-store-agile-project/pull/1

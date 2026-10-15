@@ -1,3 +1,5 @@
+> Historical pre-merge record. PR #1 has since been merged and tested. See [CURRENT-STATUS.md](CURRENT-STATUS.md) for the latest status and safe recovery procedure.
+
 # Sprint 2 — Implementation and Verification
 
 Review date: 15 October 2026. Delivery target: 17 October 2026.

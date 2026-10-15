@@ -17,3 +17,7 @@ Use Node.js 20+ for tests. To view the site, serve this directory with a local H
 This is a static student demonstration. Accounts, session state and cart data live in this browser's localStorage. Existing authentication stores passwords as plain text and is not production security; use invented test credentials only. Checkout is simulated and must use dummy payment data. No backend, real payment, stock tracking or cross-device account persistence is provided.
 
 Sprint 2 implementation, defects, evidence and remaining delivery steps are described in `docs/SPRINT-2-DELIVERY.md`. The local verification does not by itself mean changes have been merged into the shared repository.
+
+## Current delivery state
+
+PR #1 is merged and the merged application passed a fresh verification run. See [current status](docs/CURRENT-STATUS.md) for exact evidence and pending team acceptance; earlier delivery notes preserve the pre-merge history.

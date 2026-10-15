@@ -1,3 +1,5 @@
+> Historical pre-merge record. PR #1 has since been merged and tested. See [CURRENT-STATUS.md](CURRENT-STATUS.md) for the latest status and safe recovery procedure.
+
 # Yedekten devam etme — Sprint 2
 
 ## Güvenli başlangıç
