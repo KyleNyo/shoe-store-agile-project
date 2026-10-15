@@ -332,3 +332,8 @@ footer {
 .empty-state { padding:45px 20px; text-align:center; background:var(--gray-light); border-radius:12px; }
 .form-control:focus,.form-select:focus { border-color:var(--primary); box-shadow:0 0 0 .2rem rgba(255,122,0,.15); }
 .order-summary { background:var(--primary-light); border-radius:12px; padding:20px; }
+
+/* Cart controls remain usable inside the mobile table scroll area. */
+.cart-quantity { width: 80px; }
+.cart-summary { width: 100%; max-width: 360px; }
+#cartArea .table-responsive { position: relative; }

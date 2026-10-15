@@ -1,0 +1,16 @@
+{
+  "browser": "155.0.4283.45",
+  "passed": [
+    "Homepage and all local navigation destinations load",
+    "Six catalogue products, loaded images, categories and combined search",
+    "Every product detail has correct sizes and invalid IDs are handled",
+    "Add/merge sizes, reload persistence, quantity update, removal and exact totals",
+    "Guest checkout guard; registration, logout, invalid and valid login",
+    "Integrated simulated checkout preserves total and empties cart",
+    "Malformed saved cart cannot break navigation or target the wrong row",
+    "Layout and navigation at 375px",
+    "Layout and navigation at 768px",
+    "Layout and navigation at 1440px"
+  ],
+  "pageErrors": []
+}
