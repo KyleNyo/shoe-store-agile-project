@@ -6,7 +6,7 @@ Review date: 15 October 2026. Delivery target: 17 October 2026.
 
 Repository: https://github.com/KyleNyo/shoe-store-agile-project
 
-Baseline: `main` at `6ce5098` (Update style.css). Local working branch: `sprint-2-completion`. Published as draft PR #1: https://github.com/KyleNyo/shoe-store-agile-project/pull/1. Main remains unchanged; merge and sprint start have not been performed. A backup branch preserves baseline 6ce5098.
+Baseline: `main` at `6ce5098` (Update style.css). Local working branch: `sprint-2-completion`. Published as PR #1, now ready for team review: https://github.com/KyleNyo/shoe-store-agile-project/pull/1. Main remains unchanged; merge and sprint start have not been performed. A backup branch preserves baseline 6ce5098.
 
 Sprint 2 (ID 36) is still future, with Jira dates 9 October 10:00 UTC–17 October 10:00 UTC (12:00 Berlin). The three selected features total 13 points. Starting the sprint requires the user's confirmation; do not backdate an actual start.
 
@@ -60,7 +60,7 @@ Git history reviewed: KyleNyo's initial commit, Tiger1234562's integrated applic
 
 ## Documentation issues and remaining work
 
-- Project documentation says five team members but names three module owners. Confirm actual membership before editing this statement.
+- Team composition confirmed by Erdogan on 15 October: originally five members; the three active members are Erdogan Efe Demir, Kyle Nyankabaria and Muhammadyusuf Vakhobov. The other two are inactive. Confluence project and delivery pages have been updated without asserting formal removal or unsupported contributions.
 - The Sprint 1 retrospective is still an unfilled template. Actual participants must supply their reflections; no meeting or attendance has been fabricated.
 - SCRUM-6's old due date and historical Sprint 1 wording need review against Sprint 2 dates. Do not silently rewrite history.
 - Some Confluence paragraphs say browser testing is pending despite recorded partial manual results. Append this dated verification and clarify which checks are new.
@@ -87,7 +87,7 @@ Git history reviewed: KyleNyo's initial commit, Tiger1234562's integrated applic
 - [x] Real-browser integration and responsive checks passed.
 - [x] Test report and presentation sequence prepared.
 - [x] User approval for external publication received.
-- [x] Branch pushed and draft PR #1 linked.
+- [x] Branch pushed and PR #1 linked and marked ready for review.
 - [x] Defects and test evidence published to Jira; documentation updated in Confluence.
 - [ ] Shared branch integration reviewed and verified.
 - [ ] Team contribution evidence and actual retrospective completed by the team.
@@ -95,10 +95,14 @@ Git history reviewed: KyleNyo's initial commit, Tiger1234562's integrated applic
 
 ## Publication and recovery — 15 October 2026
 
-- Draft PR: https://github.com/KyleNyo/shoe-store-agile-project/pull/1
+- Review-ready PR: https://github.com/KyleNyo/shoe-store-agile-project/pull/1
 - Confluence: https://shoe-store-agile.atlassian.net/wiki/spaces/~712020765d7f79f9f14cb5b73370d4875a46fd/pages/6127619
 - Backup branch: backup/pre-sprint-2-2026-10-15 (6ce5098). Main stays on the same baseline.
 - 4 unit tests and all 10 browser groups passed again on a fresh GitHub clone of published application commit cc2bbe2. Subsequent publication notes change documentation only.
 - The old catalogue Confluence page retains all historical content, with a dated verification appendix (version 7 → 8).
 - Local backup includes the verified Git bundle, baseline source ZIP, full Jira record snapshot, affected comment/transition snapshots and Confluence HTML/version snapshot.
 - To take a different approach, branch from main or the backup; do not reset or force-push over team work. Keep review/merge and final submission pending until the team agrees.
+
+## Ready for team review
+
+PR #1 is open and no longer a draft. It remains unmerged. See `TEAM-REVIEW.md` for the independent review checklist, five-minute demo and post-approval steps. No team approval is implied. Application code has not changed since the tested commit cc2bbe2; later commits only update documentation.
