@@ -6,7 +6,7 @@ Review date: 15 October 2026. Delivery target: 17 October 2026.
 
 Repository: https://github.com/KyleNyo/shoe-store-agile-project
 
-Baseline: `main` at `6ce5098` (Update style.css). Local working branch: `sprint-2-completion`. No push, merge or sprint transition has been performed.
+Baseline: `main` at `6ce5098` (Update style.css). Local working branch: `sprint-2-completion`. Published as draft PR #1: https://github.com/KyleNyo/shoe-store-agile-project/pull/1. Main remains unchanged; merge and sprint start have not been performed. A backup branch preserves baseline 6ce5098.
 
 Sprint 2 (ID 36) is still future, with Jira dates 9 October 10:00 UTC–17 October 10:00 UTC (12:00 Berlin). The three selected features total 13 points. Starting the sprint requires the user's confirmation; do not backdate an actual start.
 
@@ -16,7 +16,7 @@ Sprint 2 (ID 36) is still future, with Jira dates 9 October 10:00 UTC–17 Octob
 | SCRUM-8 — Cart, 5 points | To Do | Add, merge matching sizes, keep different sizes separate, quantity validation, removal, persistence, empty state and totals verified locally |
 | SCRUM-9 — Integration/testing, 3 points | To Do | Homepage navigation, registration, invalid/valid login, logout, guest checkout restriction and simulated checkout verified locally |
 
-SCRUM-10, 11 and 12 are Testing; SCRUM-13 and 14 are In Progress. Existing work and assignments have been preserved. SCRUM-11 and SCRUM-12 contain truncated requirement sentences; this change does not invent the missing text.
+All three Sprint 2 features and SCRUM-10–14 are now Testing, with dated verification comments. The table records the pre-change statuses. Existing work and assignments have been preserved. SCRUM-11 and SCRUM-12 contain truncated requirement sentences; this change does not invent the missing text.
 
 ## Changes
 
@@ -30,7 +30,7 @@ SCRUM-10, 11 and 12 are Testing; SCRUM-13 and 14 are In Progress. Existing work 
 
 ## Defects reproduced and fixed locally
 
-These are local report labels, not Jira issue IDs. Jira recording awaits publication approval.
+Local report labels map respectively to Jira SCRUM-24, SCRUM-25, SCRUM-26 and SCRUM-27. They are Task records labelled sprint-2-defect because this project has no Bug type. All are Testing and linked to their corresponding feature; no story points or sprint membership were added.
 
 | Label | Reproduction / previous result | Fix / evidence |
 | --- | --- | --- |
@@ -56,7 +56,7 @@ Run `npm test` and `npm run test:browser` to reproduce. The tests use invented c
 
 Confluence records Kyle Nyankabaria as Product Owner and homepage/navigation owner; Erdogan Efe Demir as Scrum Master and catalogue/details owner; Muhammadyusuf Vakhobov as registration/login owner. Jira currently assigns all three Sprint 2 features to erdogan.demir.
 
-Git history reviewed: KyleNyo's initial commit, Tiger1234562's integrated application import (`4871889`), and Tiger1234562's stylesheet update (`6ce5098`). Import history alone does not establish authorship of every module. This delivery contains AI-assisted fixes and tests prepared in this chat; it must not be presented as new work by other team members. No commits have been created under another person's identity.
+Git history reviewed: KyleNyo's initial commit, Tiger1234562's integrated application import (`4871889`), and Tiger1234562's stylesheet update (`6ce5098`). Import history alone does not establish authorship of every module. This delivery contains AI-assisted fixes and tests prepared in this chat; it must not be presented as new work by other team members. Commit cc2bbe2 was published using the verified Tiger1234562 account identity. No commits have been created under another person's identity.
 
 ## Documentation issues and remaining work
 
@@ -66,8 +66,8 @@ Git history reviewed: KyleNyo's initial commit, Tiger1234562's integrated applic
 - Some Confluence paragraphs say browser testing is pending despite recorded partial manual results. Append this dated verification and clarify which checks are new.
 - Existing browser-only authentication stores plaintext passwords. This is a demo limitation, not secure production authentication. Do not describe the project as production ready.
 - Teacher-specific submission format/rubric and any required individual contribution evidence have not been supplied.
-- Obtain approval before push, significant Jira changes, Confluence publication or starting the sprint.
-- After approval, publish branch/PR, record linked defect evidence, and update relevant issues to Testing. Review and integrate into the shared main branch, rerun tests on that exact revision, then apply the team's Definition of Done. No work item is Done solely because this local test run passed.
+- User approval for publication was received, with a requirement to back up prior state. Backups were created and verified before changes.
+- Branch/PR publication, linked defect records, Testing statuses and Confluence reporting are complete. Review and integrate into the shared main branch, rerun tests on that exact revision, then apply the team's Definition of Done. No work item is Done solely because this local test run passed.
 
 ## Demo sequence (approximately 5 minutes)
 
@@ -86,9 +86,19 @@ Git history reviewed: KyleNyo's initial commit, Tiger1234562's integrated applic
 - [x] Local implementation and regression tests completed.
 - [x] Real-browser integration and responsive checks passed.
 - [x] Test report and presentation sequence prepared.
-- [ ] User approval for external publication received.
-- [ ] Branch pushed and review request linked.
-- [ ] Defects and test evidence published to Jira; documentation updated in Confluence.
+- [x] User approval for external publication received.
+- [x] Branch pushed and draft PR #1 linked.
+- [x] Defects and test evidence published to Jira; documentation updated in Confluence.
 - [ ] Shared branch integration reviewed and verified.
 - [ ] Team contribution evidence and actual retrospective completed by the team.
 - [ ] Teacher's required submission format checked and final submission made.
+
+## Publication and recovery — 15 October 2026
+
+- Draft PR: https://github.com/KyleNyo/shoe-store-agile-project/pull/1
+- Confluence: https://shoe-store-agile.atlassian.net/wiki/spaces/~712020765d7f79f9f14cb5b73370d4875a46fd/pages/6127619
+- Backup branch: backup/pre-sprint-2-2026-10-15 (6ce5098). Main stays on the same baseline.
+- 4 unit tests and all 10 browser groups passed again on a fresh GitHub clone of published application commit cc2bbe2. Subsequent publication notes change documentation only.
+- The old catalogue Confluence page retains all historical content, with a dated verification appendix (version 7 → 8).
+- Local backup includes the verified Git bundle, baseline source ZIP, full Jira record snapshot, affected comment/transition snapshots and Confluence HTML/version snapshot.
+- To take a different approach, branch from main or the backup; do not reset or force-push over team work. Keep review/merge and final submission pending until the team agrees.
