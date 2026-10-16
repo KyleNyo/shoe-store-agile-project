@@ -116,6 +116,13 @@ function renderCatalog() {
   const search = document.getElementById("productSearch");
   const filter = document.getElementById("categoryFilter");
   const sort = document.getElementById("priceSort");
+  const minPrice = document.getElementById("minPrice");
+  const maxPrice = document.getElementById("maxPrice");
+  const sizeFilter = document.getElementById("sizeFilter");
+  const message = document.getElementById("catalogMessage");
+
+  const sizes = [...new Set(PRODUCTS.flatMap(p => p.sizes))].sort((a, b) => a - b);
+  sizes.forEach(size => sizeFilter.add(new Option(String(size), String(size))));
 
   const q = new URLSearchParams(location.search).get("category");
 
@@ -132,9 +139,26 @@ function renderCatalog() {
   const run = () => {
     const term = search.value.trim().toLowerCase();
     const cat = filter.value;
+    const minimum = minPrice.value === "" ? null : Math.round(Number(minPrice.value) * 100);
+    const maximum = maxPrice.value === "" ? null : Math.round(Number(maxPrice.value) * 100);
+    const reversed = minimum !== null && maximum !== null && minimum > maximum;
+    const invalid = !minPrice.validity.valid || !maxPrice.validity.valid;
+
+    minPrice.setAttribute("aria-invalid", String(!minPrice.validity.valid || reversed));
+    maxPrice.setAttribute("aria-invalid", String(!maxPrice.validity.valid || reversed));
+    if (invalid || reversed) {
+      grid.innerHTML = "";
+      message.innerHTML = '<div class="alert alert-warning">' + (invalid
+        ? "Enter non-negative prices with up to two decimal places."
+        : "Minimum price must not exceed maximum price.") + '</div>';
+      return;
+    }
 
     const list = PRODUCTS.filter(p =>
       (cat === "All" || p.category === cat) &&
+      (minimum === null || Math.round(p.price * 100) >= minimum) &&
+      (maximum === null || Math.round(p.price * 100) <= maximum) &&
+      (sizeFilter.value === "" || p.sizes.includes(Number(sizeFilter.value))) &&
       (p.name.toLowerCase().includes(term) || p.description.toLowerCase().includes(term))
     );
 
@@ -146,14 +170,17 @@ function renderCatalog() {
 
     grid.innerHTML = list.map(card).join("");
 
-    document.getElementById("catalogMessage").innerHTML = list.length
+    message.innerHTML = list.length
       ? ""
-      : '<div class="alert alert-warning">No shoes match your search.</div>';
+      : '<div class="alert alert-warning">No shoes match your search and filters.</div>';
   };
 
   search.addEventListener("input", run);
   filter.addEventListener("change", run);
   sort.addEventListener("change", run);
+  minPrice.addEventListener("input", run);
+  maxPrice.addEventListener("input", run);
+  sizeFilter.addEventListener("change", run);
   run();
 }
 

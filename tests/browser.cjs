@@ -70,6 +70,55 @@ const server = http.createServer((req, res) => {
       await goto('index.html');
       assert.deepEqual(await page.locator('#featuredProducts h5').allTextContents(),original.slice(0,3));
     });
+    await check('Inclusive price bounds and available sizes combine with search/category/sort', async () => {
+      await goto('catalog.html');
+      const names = () => page.locator('#productGrid h5').allTextContents();
+      assert.deepEqual(await page.locator('#sizeFilter option').evaluateAll(items=>items.map(i=>i.value)),['','38','39','40','41','42','43','44','45','46']);
+      await page.getByRole('spinbutton',{name:'Minimum price (EUR)'}).fill('64.99');
+      await page.getByRole('spinbutton',{name:'Maximum price (EUR)'}).fill('64.99');
+      assert.deepEqual(await names(),['Street Classic']);
+      await page.fill('#maxPrice','79.99'); await page.selectOption('#priceSort','price-asc');
+      assert.deepEqual(await names(),['Street Classic','Court Low','Velocity Runner']);
+      await page.getByRole('combobox',{name:'Shoe size (EU)'}).selectOption('39');
+      assert.deepEqual(await names(),['Street Classic','Court Low']);
+      await page.selectOption('#categoryFilter','Sneakers'); await page.fill('#productSearch','street');
+      assert.deepEqual(await names(),['Street Classic']);
+      assert.equal(await page.locator('#priceSort').inputValue(),'price-asc');
+      assert.equal(await page.locator('#sizeFilter').inputValue(),'39');
+      await page.fill('#productSearch',''); await page.selectOption('#categoryFilter','All');
+      await page.fill('#minPrice',''); await page.fill('#maxPrice','');
+      await page.selectOption('#sizeFilter','46'); assert.deepEqual(await names(),['Trail Motion']);
+      await page.fill('#maxPrice','90'); assert.deepEqual(await names(),[]);
+      assert.match(await page.locator('#catalogMessage').innerText(),/No shoes match/);
+      await page.fill('#maxPrice',''); await page.selectOption('#sizeFilter','38');
+      assert.deepEqual(await names(),['Summer Slide']);
+      await page.selectOption('#sizeFilter',''); await page.fill('#maxPrice','0'); assert.deepEqual(await names(),[]);
+      await page.fill('#maxPrice',''); assert.equal((await names()).length,6);
+    });
+    await check('Invalid prices and reversed ranges show accessible errors and recover', async () => {
+      await goto('catalog.html');
+      for (const [selector,value] of [['#minPrice','-1'],['#minPrice','1.001'],['#maxPrice','-0.01']]) {
+        await page.fill(selector,value);
+        assert.equal(await page.locator(selector).getAttribute('aria-invalid'),'true');
+        assert.match(await page.locator('#catalogMessage').innerText(),/non-negative prices/);
+        assert.equal(await page.locator('.product-card').count(),0);
+        await page.fill(selector,'');
+        assert.equal(await page.locator(selector).getAttribute('aria-invalid'),'false');
+        assert.equal(await page.locator('.product-card').count(),6);
+      }
+      await page.fill('#minPrice','80'); await page.fill('#maxPrice','60');
+      assert.match(await page.locator('#catalogMessage').innerText(),/must not exceed/);
+      assert.equal(await page.locator('#minPrice').getAttribute('aria-invalid'),'true');
+      assert.equal(await page.locator('#maxPrice').getAttribute('aria-invalid'),'true');
+      await page.fill('#maxPrice','100');
+      assert.equal(await page.locator('.product-card').count(),2);
+      assert.equal(await page.locator('#minPrice').getAttribute('aria-invalid'),'false');
+      await page.fill('#minPrice',''); await page.locator('#minPrice').press('e');
+      assert.equal(await page.locator('#minPrice').getAttribute('aria-invalid'),'true');
+      assert.match(await page.locator('#catalogMessage').innerText(),/non-negative prices/);
+      await page.fill('#minPrice',''); await page.fill('#maxPrice','');
+      assert.equal(await page.locator('.product-card').count(),6);
+    });
     await check('Every product detail has correct sizes and invalid IDs are handled', async () => {
       for(const [id,count] of [['runner',6],['street',6],['formal',6],['sand',6],['court',7],['trail',7]]) {
         await goto('product-detail.html?id='+id);
