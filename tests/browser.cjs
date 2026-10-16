@@ -45,6 +45,31 @@ const server = http.createServer((req, res) => {
       await page.fill('#productSearch','zzzz'); assert.match(await page.locator('#catalogMessage').innerText(),/No shoes match/);
       await goto('catalog.html?category=invalid'); assert.equal(await page.locator('.product-card').count(),6);
     });
+    await check('Price sorting preserves search/categories, default order and shared product order', async () => {
+      await goto('catalog.html');
+      const names = () => page.locator('#productGrid h5').allTextContents();
+      const original = ['Velocity Runner','Street Classic','Oxford Essential','Summer Slide','Court Low','Trail Motion'];
+      const ascending = ['Summer Slide','Street Classic','Court Low','Velocity Runner','Oxford Essential','Trail Motion'];
+      const sort = page.getByRole('combobox',{name:'Sort by price'});
+      assert.deepEqual(await names(),original);
+      await sort.selectOption('price-asc'); assert.deepEqual(await names(),ascending);
+      await sort.selectOption('price-desc'); assert.deepEqual(await names(),[...ascending].reverse());
+      await page.selectOption('#categoryFilter','Sneakers');
+      assert.deepEqual(await names(),['Court Low','Street Classic']);
+      assert.equal(await sort.inputValue(),'price-desc');
+      await page.fill('#productSearch',' street '); assert.deepEqual(await names(),['Street Classic']);
+      await page.fill('#productSearch','zzzz'); assert.deepEqual(await names(),[]);
+      assert.match(await page.locator('#catalogMessage').innerText(),/No shoes match/);
+      await page.fill('#productSearch',''); await page.selectOption('#categoryFilter','All');
+      assert.deepEqual(await names(),[...ascending].reverse());
+      await sort.selectOption('default'); assert.deepEqual(await names(),original);
+      await goto('catalog.html?search=shoe'); await sort.selectOption('price-asc');
+      assert.deepEqual(await names(),['Velocity Runner','Oxford Essential']);
+      assert.match(await page.locator('#productGrid a').first().getAttribute('href'),/product-detail.html\?id=runner/);
+      assert.deepEqual(await page.evaluate(() => PRODUCTS.map(p=>p.id)),['runner','street','formal','sand','court','trail']);
+      await goto('index.html');
+      assert.deepEqual(await page.locator('#featuredProducts h5').allTextContents(),original.slice(0,3));
+    });
     await check('Every product detail has correct sizes and invalid IDs are handled', async () => {
       for(const [id,count] of [['runner',6],['street',6],['formal',6],['sand',6],['court',7],['trail',7]]) {
         await goto('product-detail.html?id='+id);

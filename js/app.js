@@ -115,6 +115,7 @@ function renderCatalog() {
 
   const search = document.getElementById("productSearch");
   const filter = document.getElementById("categoryFilter");
+  const sort = document.getElementById("priceSort");
 
   const q = new URLSearchParams(location.search).get("category");
 
@@ -137,6 +138,12 @@ function renderCatalog() {
       (p.name.toLowerCase().includes(term) || p.description.toLowerCase().includes(term))
     );
 
+    if (sort.value === "price-asc") {
+      list.sort((a, b) => a.price - b.price);
+    } else if (sort.value === "price-desc") {
+      list.sort((a, b) => b.price - a.price);
+    }
+
     grid.innerHTML = list.map(card).join("");
 
     document.getElementById("catalogMessage").innerHTML = list.length
@@ -146,6 +153,7 @@ function renderCatalog() {
 
   search.addEventListener("input", run);
   filter.addEventListener("change", run);
+  sort.addEventListener("change", run);
   run();
 }
 
