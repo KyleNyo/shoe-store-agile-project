@@ -315,13 +315,81 @@ function initCheckout() {
 
   document.getElementById("checkoutSummary").innerHTML = `<h5>Order Summary</h5>${c.map(x => `<div class="d-flex justify-content-between"><span>${x.p.name} × ${x.qty}</span><span>${euro(subtotalCents(x) / 100)}</span></div>`).join("")}<hr><div class="d-flex justify-content-between fw-bold"><span>Total</span><span>${euro(total)}</span></div>`;
 
+  const errorSummary = document.getElementById("checkoutErrors");
+  const errorList = document.getElementById("checkoutErrorList");
+  const fields = [
+    ["fullName", "Full name", "Enter your full name."],
+    ["checkoutEmail", "Email", "Enter your email address."],
+    ["address", "Address", "Enter your delivery address."],
+    ["city", "City", "Enter your city."],
+    ["postal", "Postal code", "Enter your postal code."],
+    ["cardNumber", "Card number", "Enter an invented card number using 12 to 19 digits; spaces are allowed."]
+  ].map(([id, label, requiredMessage]) => {
+    const input = document.getElementById(id);
+    const error = document.createElement("p");
+    error.id = `${id}Error`;
+    error.className = "text-danger small mt-1 mb-0";
+    error.hidden = true;
+    input.after(error);
+    return { input, error, label, requiredMessage };
+  });
+  let submitted = false;
+
+  const validate = () => {
+    errorList.replaceChildren();
+    let errorCount = 0;
+
+    fields.forEach(({ input, error, label, requiredMessage }) => {
+      let message = input.value.trim() ? "" : requiredMessage;
+      if (!message && input.id === "checkoutEmail" && input.validity.typeMismatch) {
+        message = "Enter an email address such as name@example.com.";
+      }
+      if (!message && input.id === "cardNumber" &&
+          (!/^[0-9 ]+$/.test(input.value) || !/^\d{12,19}$/.test(input.value.replace(/ /g, "")))) {
+        message = requiredMessage;
+      }
+
+      input.setAttribute("aria-invalid", String(Boolean(message)));
+      input.classList.toggle("is-invalid", Boolean(message));
+      error.textContent = message;
+      error.hidden = !message;
+      const descriptions = (input.getAttribute("aria-describedby") || "").split(/\s+/)
+        .filter(id => id && id !== error.id);
+      if (message) descriptions.push(error.id);
+      if (descriptions.length) input.setAttribute("aria-describedby", descriptions.join(" "));
+      else input.removeAttribute("aria-describedby");
+
+      if (message) {
+        errorCount++;
+        const item = document.createElement("li");
+        const link = document.createElement("a");
+        link.href = `#${input.id}`;
+        link.textContent = `${label}: ${message}`;
+        link.addEventListener("click", event => {
+          event.preventDefault();
+          input.focus();
+        });
+        item.append(link);
+        errorList.append(item);
+      }
+    });
+
+    document.getElementById("checkoutErrorsTitle").textContent = errorCount === 1
+      ? "There is 1 problem" : `There are ${errorCount} problems`;
+    errorSummary.hidden = errorCount === 0;
+    return errorCount === 0;
+  };
+
+  fields.forEach(({ input }) => input.addEventListener("input", () => {
+    if (submitted) validate();
+  }));
+
   form.onsubmit = e => {
     e.preventDefault();
+    submitted = true;
 
-    const num = document.getElementById("cardNumber").value.replace(/\s/g, "");
-
-    if (!/^\d{12,19}$/.test(num)) {
-      alert("Please enter a valid simulated card number.");
+    if (!validate()) {
+      errorSummary.focus();
       return;
     }
 
@@ -332,6 +400,8 @@ function initCheckout() {
 
     location.href = "confirmation.html";
   };
+  // Keep native constraints as a fallback until the custom validator is installed.
+  form.noValidate = true;
 }
 
 function renderConfirmation() {

@@ -81,6 +81,80 @@ const server = http.createServer((req, res) => {
       await page.fill('#loginPassword','demo-pass-123');await page.locator('#loginForm button').click();
       assert.equal(await page.locator('#loggedInUser').innerText(),'Sprint Test');
     });
+    await check('Checkout errors are linked, keyboard-focusable and preserve valid input and stored cart', async () => {
+      await goto('checkout.html');
+      const cartBefore = await page.evaluate(()=>localStorage.getItem('ss_cart'));
+      const orderBefore = await page.evaluate(()=>localStorage.getItem('ss_last_order'));
+      for (const id of ['fullName','checkoutEmail','address','postal','cardNumber']) await page.fill('#'+id,'');
+      await page.getByLabel('City',{exact:true}).fill('Test City');
+      await page.getByRole('button',{name:'Place Order',exact:true}).click();
+      assert.equal(await page.locator('#checkoutErrors').evaluate(el=>el===document.activeElement),true);
+      assert.equal(await page.locator('#checkoutErrorList a').count(),5);
+      assert.equal(await page.locator('#checkoutErrorsTitle').innerText(),'There are 5 problems');
+      assert.equal(await page.getByLabel('City',{exact:true}).inputValue(),'Test City');
+      for (const id of ['fullName','checkoutEmail','address','postal','cardNumber']) {
+        assert.equal(await page.locator('#'+id).getAttribute('aria-invalid'),'true');
+        assert.ok((await page.locator('#'+id).getAttribute('aria-describedby')).split(' ').includes(id+'Error'));
+        assert.equal(await page.locator('#'+id+'Error').isVisible(),true);
+      }
+      const addressLink = page.locator('#checkoutErrorList a[href="#address"]');
+      await addressLink.focus(); await addressLink.press('Enter');
+      assert.equal(await page.getByLabel('Address',{exact:true}).evaluate(el=>el===document.activeElement),true);
+      await page.getByLabel('Address',{exact:true}).fill('Test Street 1');
+      assert.equal(await page.locator('#address').getAttribute('aria-invalid'),'false');
+      assert.equal(await page.locator('#addressError').isVisible(),false);
+      assert.equal(await page.locator('#checkoutErrorList a').count(),4);
+      assert.equal(await page.locator('#address').evaluate(el=>el===document.activeElement),true);
+      await page.getByLabel('Full name',{exact:true}).fill('Sprint Test');
+      await page.getByLabel('Email',{exact:true}).fill('invalid');
+      assert.match(await page.locator('#checkoutEmailError').innerText(),/name@example.com/);
+      await page.getByLabel('Email',{exact:true}).fill('sprint@example.test');
+      await page.getByLabel('Postal code',{exact:true}).fill('12345');
+      await page.getByLabel('Card number',{exact:true}).fill('1111 2222 3333 4444');
+      assert.equal(await page.locator('#checkoutErrors').isVisible(),false);
+      assert.equal(await page.locator('#cardNumber').getAttribute('aria-describedby'),'simulatedPaymentHelp');
+      assert.equal(await page.evaluate(()=>localStorage.getItem('ss_cart')),cartBefore);
+      assert.equal(await page.evaluate(()=>localStorage.getItem('ss_last_order')),orderBefore);
+    });
+    await check('Checkout rejects whitespace-only fields and invalid simulated cards with mobile error recovery', async () => {
+      await page.setViewportSize({width:375,height:900});
+      for (const id of ['fullName','address','city','postal']) {
+        const input = page.locator('#'+id);
+        const original = await input.inputValue();
+        await input.fill('   ');
+        assert.equal(await input.getAttribute('aria-invalid'),'true');
+        await input.fill(original);
+        assert.equal(await input.getAttribute('aria-invalid'),'false');
+      }
+      for (const value of ['11112222333','11112222333344445555','1111-2222-3333','11112222333a','            ']) {
+        await page.getByLabel('Card number',{exact:true}).fill(value);
+        assert.equal(await page.locator('#cardNumber').getAttribute('aria-invalid'),'true');
+        assert.match(await page.locator('#cardNumberError').innerText(),/12 to 19 digits/);
+      }
+      for (const value of ['111122223333','1111 2222 3333 4444','1111 2222 3333 4444 555']) {
+        await page.getByLabel('Card number',{exact:true}).fill(value);
+        assert.equal(await page.locator('#cardNumber').getAttribute('aria-invalid'),'false');
+        assert.equal(await page.locator('#checkoutErrors').isVisible(),false);
+      }
+      await page.getByLabel('Email',{exact:true}).fill('invalid');
+      await page.getByRole('button',{name:'Place Order',exact:true}).click();
+      assert.equal(await page.locator('#checkoutErrorsTitle').innerText(),'There is 1 problem');
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+      fs.mkdirSync(path.join(root,'test-results'),{recursive:true});
+      await page.screenshot({path:path.join(root,'test-results','checkout-validation-mobile.png'),fullPage:true});
+      await page.locator('#checkoutErrorList a').focus();
+      await page.locator('#checkoutErrorList a').press('Enter');
+      assert.equal(await page.getByLabel('Email',{exact:true}).evaluate(el=>el===document.activeElement),true);
+      await page.getByLabel('Email',{exact:true}).fill('sprint@example.test');
+      assert.equal(await page.locator('#checkoutErrors').isVisible(),false);
+      await page.getByLabel('Card number',{exact:true}).fill('1111222233334444');
+      await page.getByLabel('Card number',{exact:true}).press('Enter');
+      await page.waitForURL('**/confirmation.html');
+      assert.match(await page.locator('#orderNumber').innerText(),/194[.,]97/);
+      assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('ss_cart'))),[]);
+      await page.evaluate(()=>localStorage.setItem('ss_cart',JSON.stringify([{id:'street',size:42,qty:3}])));
+      await page.setViewportSize({width:1280,height:900});
+    });
     await check('Integrated simulated checkout preserves total and empties cart', async () => {
       await goto('checkout.html');assert.match(await page.locator('#checkoutSummary').innerText(),/194[.,]97/);
       await page.fill('#address','Test Street 1');await page.fill('#city','Test City');await page.fill('#postal','12345');await page.fill('#cardNumber','1111222233334444');
