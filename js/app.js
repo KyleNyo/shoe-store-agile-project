@@ -181,6 +181,23 @@ function renderCatalog() {
   minPrice.addEventListener("input", run);
   maxPrice.addEventListener("input", run);
   sizeFilter.addEventListener("change", run);
+  document.getElementById("resetFilters").addEventListener("click", () => {
+    search.value = "";
+    filter.value = "All";
+    sort.value = "default";
+    minPrice.value = "";
+    maxPrice.value = "";
+    sizeFilter.value = "";
+
+    // Remove initial catalogue restrictions so reloading keeps the reset state.
+    const url = new URL(location.href);
+    url.searchParams.delete("search");
+    url.searchParams.delete("category");
+    history.replaceState(history.state, "", url);
+
+    run();
+    message.textContent = `Filters reset. Showing all ${PRODUCTS.length} shoes.`;
+  });
   run();
 }
 

@@ -119,6 +119,69 @@ const server = http.createServer((req, res) => {
       await page.fill('#minPrice',''); await page.fill('#maxPrice','');
       assert.equal(await page.locator('.product-card').count(),6);
     });
+    await check('Reset clears combined controls and stale URL filters without changing cart or product data', async () => {
+      await goto('catalog.html?search=street&search=trail&category=Sneakers&campaign=demo#productGrid');
+      const original = ['Velocity Runner','Street Classic','Oxford Essential','Summer Slide','Court Low','Trail Motion'];
+      const savedCart = await page.evaluate(() => {
+        const value = JSON.stringify([{id:'street',size:42,qty:2}]);
+        localStorage.setItem('ss_cart',value);
+        history.replaceState({demo:true},'',location.href);
+        return value;
+      });
+      await page.selectOption('#priceSort','price-desc');
+      await page.fill('#minPrice','64.99'); await page.fill('#maxPrice','79.99');
+      await page.selectOption('#sizeFilter','39');
+      assert.equal(await page.locator('.product-card').count(),1);
+      await page.getByRole('button',{name:'Reset filters',exact:true}).click();
+      for (const [id,value] of [['productSearch',''],['categoryFilter','All'],['priceSort','default'],['minPrice',''],['maxPrice',''],['sizeFilter','']]) {
+        assert.equal(await page.locator('#'+id).inputValue(),value);
+      }
+      assert.deepEqual(await page.locator('#productGrid h5').allTextContents(),original);
+      const url = new URL(page.url());
+      assert.equal(url.searchParams.has('search'),false);
+      assert.equal(url.searchParams.has('category'),false);
+      assert.equal(url.searchParams.get('campaign'),'demo');
+      assert.equal(url.hash,'#productGrid');
+      assert.deepEqual(await page.evaluate(() => history.state),{demo:true});
+      assert.equal(await page.evaluate(() => localStorage.getItem('ss_cart')),savedCart);
+      assert.deepEqual(await page.evaluate(() => PRODUCTS.map(p=>p.name)),original);
+      assert.equal(await page.locator('#catalogMessage').innerText(),'Filters reset. Showing all 6 shoes.');
+      await page.reload();
+      assert.deepEqual(await page.locator('#productGrid h5').allTextContents(),original);
+      await page.evaluate(() => localStorage.removeItem('ss_cart'));
+    });
+    await check('Keyboard reset recovers from invalid ranges and no-match results at mobile width', async () => {
+      await page.setViewportSize({width:375,height:900});
+      await goto('catalog.html');
+      const reset = page.getByRole('button',{name:'Reset filters',exact:true});
+      for (const mode of ['reversed','negative','bad-input','no-match']) {
+        if(mode==='reversed') {await page.fill('#minPrice','80');await page.fill('#maxPrice','60');}
+        if(mode==='negative') await page.fill('#minPrice','-1');
+        if(mode==='bad-input') {await page.locator('#minPrice').focus();await page.locator('#minPrice').press('e');}
+        if(mode==='no-match') await page.fill('#productSearch','does-not-exist');
+        assert.equal(await page.locator('.product-card').count(),0);
+        await reset.focus(); await reset.press(mode==='no-match'?'Space':'Enter');
+        assert.equal(await reset.evaluate(el=>el===document.activeElement),true);
+        assert.equal(await page.locator('.product-card').count(),6);
+        assert.equal(await page.locator('#minPrice').getAttribute('aria-invalid'),'false');
+        assert.equal(await page.locator('#maxPrice').getAttribute('aria-invalid'),'false');
+      }
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+      await page.setViewportSize({width:1280,height:900});
+    });
+    await check('Homepage search can be reset and refined again without stale results', async () => {
+      await goto('index.html');
+      await page.fill('#homeSearch',' street ');
+      await page.locator('#homeSearchForm').evaluate(form=>form.requestSubmit());
+      await page.waitForURL('**/catalog.html?search=street');
+      assert.equal(await page.locator('.product-card').count(),1);
+      await page.getByRole('button',{name:'Reset filters',exact:true}).click();
+      await page.reload();
+      assert.equal(await page.locator('.product-card').count(),6);
+      await page.selectOption('#categoryFilter','Running');
+      await page.selectOption('#priceSort','price-desc');
+      assert.deepEqual(await page.locator('#productGrid h5').allTextContents(),['Trail Motion','Velocity Runner']);
+    });
     await check('Every product detail has correct sizes and invalid IDs are handled', async () => {
       for(const [id,count] of [['runner',6],['street',6],['formal',6],['sand',6],['court',7],['trail',7]]) {
         await goto('product-detail.html?id='+id);
