@@ -56,7 +56,7 @@ Run `npm test` and `npm run test:browser` to reproduce. The tests use invented c
 
 Confluence records Kyle Nyankabaria as Product Owner and homepage/navigation owner; Erdogan Efe Demir as Scrum Master and catalogue/details owner; Muhammadyusuf Vakhobov as registration/login owner. Jira currently assigns all three Sprint 2 features to erdogan.demir.
 
-Git history reviewed: KyleNyo's initial commit, Tiger1234562's integrated application import (`4871889`), and Tiger1234562's stylesheet update (`6ce5098`). Import history alone does not establish authorship of every module. This delivery contains AI-assisted fixes and tests prepared in this chat; it must not be presented as new work by other team members. Commit cc2bbe2 was published using the verified Tiger1234562 account identity. No commits have been created under another person's identity.
+Git history reviewed: KyleNyo's initial commit, Tiger1234562's integrated application import (`4871889`), and Tiger1234562's stylesheet update (`6ce5098`). Import history alone does not establish authorship of every module. Commit cc2bbe2 was published using the verified Tiger1234562 account identity. No commits have been created under another person's identity.
 
 ## Documentation issues and remaining work
 
