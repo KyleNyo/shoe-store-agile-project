@@ -1,6 +1,6 @@
 # Printable order summary - SCRUM-38
 
-Prepared with AI assistance for Erdogan Efe Demir on 17 October 2026.
+Prepared on 17 October 2026.
 
 ## Behavior
 

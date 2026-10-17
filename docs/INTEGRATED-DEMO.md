@@ -1,6 +1,6 @@
 # Integrated presentation demo
 
-Prepared on 17 October 2026 with AI assistance for Erdogan Efe Demir.
+Prepared on 17 October 2026.
 
 ## Exact scope
 

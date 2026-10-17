@@ -1,6 +1,6 @@
 # Accessible checkout validation — SCRUM-37
 
-Prepared with AI assistance for Erdogan Efe Demir on 17 October 2026.
+Prepared on 17 October 2026.
 
 ## Behavior
 

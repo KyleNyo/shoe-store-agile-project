@@ -22,4 +22,3 @@ Run `npm test` and `npm run test:browser` after installing the declared dependen
 - Depends on the separate SCRUM-33 sorting change. Review only the filter delta against `catalog-price-sorting`; do not merge dependent changes in a way that discards sorting.
 - No Sprint 2 membership, estimates, merge or team approval were invented. Main remains the Sprint 2 revision `02c923a`.
 - A verified pre-change full-history Git bundle is saved as `Fiyat-numara-filtreleri-oncesi-yedek.bundle`.
-- Prepared with AI assistance for Erdogan Efe Demir; no teammate contribution is asserted.

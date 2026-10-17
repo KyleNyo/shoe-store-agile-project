@@ -17,7 +17,6 @@ The responsive controls have visible labels, including an accessible Sort by pri
 - No Sprint 2 membership or story-point estimate was added for this follow-up.
 - A verified pre-change Git bundle was saved locally as `Fiyat-siralama-oncesi-yedek.bundle`.
 - Main and the Sprint 2 source package are preserved. Use main/the baseline commit to demonstrate Sprint 2; use this separate branch to preview sorting.
-- Prepared with AI assistance for Erdogan Efe Demir; no teammate contribution or review is claimed.
 
 ## Verification
 
