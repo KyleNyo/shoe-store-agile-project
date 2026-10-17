@@ -20,4 +20,6 @@ Sprint 2 implementation, defects, evidence and remaining delivery steps are desc
 
 ## Current delivery state
 
-PR #1 is merged and the merged application passed a fresh verification run. See [current status](docs/CURRENT-STATUS.md) for exact evidence and pending team acceptance; earlier delivery notes preserve the pre-merge history.
+The `integrated-demo` branch contains the presentation demo: the Sprint 2 main baseline plus price sorting, price/size filters, reset controls, accessible checkout errors and printable order summaries. See [integrated demo instructions and verification](docs/INTEGRATED-DEMO.md). Main has not been changed by this integration. These follow-up features remain separate from the four-item, 17-point Sprint 2 accounting.
+
+`docs/CURRENT-STATUS.md` and earlier delivery notes preserve historical states; use the integrated demo document for this branch's current behavior and test results.
