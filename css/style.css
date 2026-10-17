@@ -331,6 +331,8 @@ footer {
 .cart-count { background:var(--primary); color:#fff; border-radius:20px; padding:2px 7px; font-size:.75rem; }
 .empty-state { padding:45px 20px; text-align:center; background:var(--gray-light); border-radius:12px; }
 .form-control:focus,.form-select:focus { border-color:var(--primary); box-shadow:0 0 0 .2rem rgba(255,122,0,.15); }
+.checkout-error-summary:focus { outline:3px solid currentColor; outline-offset:3px; }
+.checkout-error-summary, #checkoutForm input { scroll-margin-top:6rem; }
 .order-summary { background:var(--primary-light); border-radius:12px; padding:20px; }
 
 /* Cart controls remain usable inside the mobile table scroll area. */
