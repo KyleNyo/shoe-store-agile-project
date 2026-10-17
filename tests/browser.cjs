@@ -18,7 +18,8 @@ const server = http.createServer((req, res) => {
 (async () => {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${server.address().port}`;
-  const browser = await chromium.launch({channel:process.env.BROWSER_CHANNEL || 'msedge', headless:true});
+  const channel = process.env.BROWSER_CHANNEL || 'msedge';
+  const browser = await chromium.launch({...(channel === 'chromium' ? {} : {channel}), headless:true});
   const context = await browser.newContext();
   const page = await context.newPage();
   const errors = [];
