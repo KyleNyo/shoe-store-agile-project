@@ -356,3 +356,12 @@ footer {
 .cart-quantity { width: 80px; }
 .cart-summary { width: 100%; max-width: 360px; }
 #cartArea .table-responsive { position: relative; }
+
+/* Keyboard access and reserved product image geometry. */
+:focus-visible { outline:3px solid #172554 !important; outline-offset:3px; }
+a, button, input, select { scroll-margin-top:6rem; }
+.skip-link { position:fixed; left:1rem; top:-100px; z-index:2000; padding:12px 18px; background:#fff; color:#172554; border:2px solid; }
+.skip-link:focus { top:1rem; }
+#mainContent { scroll-margin-top:6rem; }
+img[data-product-image] { aspect-ratio:800 / 520; object-fit:cover; }
+@media print { .skip-link { display:none; } }

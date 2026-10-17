@@ -61,8 +61,22 @@ function updateNav() {
   if (a) a.textContent = user() ? "Account" : "Login";
 }
 
-function card(p) {
-  return `<div class="col-sm-6 col-lg-4"><div class="product-card"><img class="product-image" src="${p.image}" alt="${p.name}"><div class="card-body"><span class="badge badge-orange">${p.category}</span><h5 class="mt-2">${p.name}</h5><p class="text-muted">${p.description}</p><div class="d-flex justify-content-between align-items-center"><span class="price">${euro(p.price)}</span><a class="btn btn-outline-primary btn-sm" href="product-detail.html?id=${p.id}">View Details</a></div></div></div></div>`;
+function productImage(p, detail = false, eager = detail) {
+  return `<img data-product-image class="${detail ? 'img-fluid rounded' : 'product-image'}" src="${p.image}" alt="${p.name}" width="800" height="520" decoding="async" loading="${eager ? 'eager' : 'lazy'}">`;
+}
+
+function initImageFallback() {
+  document.addEventListener("error", event => {
+    const image = event.target;
+    if (!image.matches?.("img[data-product-image]") || image.dataset.fallback) return;
+    image.dataset.fallback = "true";
+    image.alt += " — image unavailable";
+    image.src = "img/product-unavailable.svg";
+  }, true);
+}
+
+function card(p, index) {
+  return `<div class="col-sm-6 col-lg-4"><div class="product-card">${productImage(p, false, index < 3)}<div class="card-body"><span class="badge badge-orange">${p.category}</span><h5 class="mt-2">${p.name}</h5><p class="text-muted">${p.description}</p><div class="d-flex justify-content-between align-items-center"><span class="price">${euro(p.price)}</span><a class="btn btn-outline-primary btn-sm" href="product-detail.html?id=${p.id}">View Details</a></div></div></div></div>`;
 }
 
 function addToCart(id, size) {
@@ -212,7 +226,7 @@ function renderDetail() {
     return;
   }
 
-  el.innerHTML = `<div class="row g-4"><div class="col-md-6"><img src="${p.image}" class="img-fluid rounded" alt="${p.name}"></div><div class="col-md-6"><span class="badge badge-orange">${p.category}</span><h2 class="mt-2">${p.name}</h2><p>${p.description}</p><p class="price">${euro(p.price)}</p><label class="form-label" for="shoeSize">Size</label><select id="shoeSize" class="form-select mb-3">${p.sizes.map(s => `<option>${s}</option>`).join("")}</select><button id="addBtn" class="btn btn-primary">Add to Cart</button></div></div>`;
+  el.innerHTML = `<div class="row g-4"><div class="col-md-6">${productImage(p, true)}</div><div class="col-md-6"><span class="badge badge-orange">${p.category}</span><h2 class="mt-2">${p.name}</h2><p>${p.description}</p><p class="price">${euro(p.price)}</p><label class="form-label" for="shoeSize">Size</label><select id="shoeSize" class="form-select mb-3">${p.sizes.map(s => `<option>${s}</option>`).join("")}</select><button id="addBtn" class="btn btn-primary">Add to Cart</button></div></div>`;
 
   document.getElementById("addBtn").onclick = () => addToCart(p.id, document.getElementById("shoeSize").value);
 }
@@ -257,6 +271,7 @@ function initAuth() {
     msg.innerHTML = '<div class="alert alert-success">Account created.</div>';
     updateNav();
     refresh();
+    document.getElementById("logoutBtn").focus();
   };
 
   lf.onsubmit = e => {
@@ -277,6 +292,7 @@ function initAuth() {
     msg.innerHTML = '<div class="alert alert-success">Signed in successfully.</div>';
     updateNav();
     refresh();
+    document.getElementById("logoutBtn").focus();
   };
 
   document.getElementById("logoutBtn").onclick = () => {
@@ -284,6 +300,13 @@ function initAuth() {
     msg.innerHTML = '<div class="alert alert-success">You have logged out.</div>';
     updateNav();
     refresh();
+    const loginTab = document.getElementById("loginTab");
+    if (!loginTab.classList.contains("active")) {
+      loginTab.addEventListener("shown.bs.tab", () => document.getElementById("loginEmail").focus(), { once: true });
+      bootstrap.Tab.getOrCreateInstance(loginTab).show();
+    } else {
+      document.getElementById("loginEmail").focus();
+    }
   };
 
   refresh();
@@ -323,9 +346,12 @@ function renderCart() {
     const item = current.find(row => row.id === selected.id && row.size === selected.size);
 
     if (item) item.qty = quantity;
+    selected.qty = quantity;
 
     write("ss_cart", current);
-    renderCart();
+    input.closest("tr").cells[4].textContent = euro(subtotalCents({ ...selected, qty: quantity }) / 100);
+    el.querySelector(".cart-summary h5").textContent = `Total: ${euro(totalPrice(cartRows()))}`;
+    document.getElementById("cartMessage").textContent = "Quantity updated.";
     updateNav();
   });
 
@@ -334,8 +360,11 @@ function renderCart() {
 
     write("ss_cart", cart().filter(row => row.id !== selected.id || row.size !== selected.size));
 
+    const nextIndex = Number(button.dataset.remove);
     renderCart();
     updateNav();
+    const remaining = el.querySelectorAll("[data-remove]");
+    (remaining[Math.min(nextIndex, remaining.length - 1)] || el.querySelector("a")).focus();
   });
 }
 
@@ -520,6 +549,7 @@ function renderConfirmation() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  initImageFallback();
   updateNav();
   renderHome();
   initHomeSearch();

@@ -1,10 +1,13 @@
-const {chromium} = require('playwright');
+const {chromium, firefox} = require('playwright');
 const assert = require('node:assert/strict');
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const results = [];
+const channel = process.env.BROWSER_CHANNEL || 'msedge';
+const evidence = path.join(root, 'test-results', channel);
+fs.mkdirSync(evidence,{recursive:true});
 const server = http.createServer((req, res) => {
   const pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
   const file = path.resolve(root, '.' + (pathname === '/' ? '/index.html' : pathname));
@@ -18,8 +21,7 @@ const server = http.createServer((req, res) => {
 (async () => {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${server.address().port}`;
-  const channel = process.env.BROWSER_CHANNEL || 'msedge';
-  const browser = await chromium.launch({...(channel === 'chromium' ? {} : {channel}), headless:true});
+  const browser = await (channel === 'firefox' ? firefox : chromium).launch({...(['chromium','firefox'].includes(channel) ? {} : {channel}), headless:true});
   const context = await browser.newContext();
   const page = await context.newPage();
   const errors = [];
@@ -28,6 +30,85 @@ const server = http.createServer((req, res) => {
   const check = async(name, fn) => {await fn(); results.push(name); console.log('PASS ' + name);};
   const goto = file => page.goto(base + '/' + file);
   try {
+    await check('Keyboard skip links, visible focus, labelled controls and mobile menu', async () => {
+      for (const file of ['index.html','catalog.html','product-detail.html?id=street','cart.html','login.html','checkout.html']) {
+        await goto(file);
+        await page.keyboard.press('Tab');
+        assert.equal(await page.locator('.skip-link').evaluate(el=>el===document.activeElement),true,file);
+        assert.equal(await page.locator('.skip-link').evaluate(el=>getComputedStyle(el).outlineStyle),'solid');
+        await page.keyboard.press('Enter');
+        assert.equal(await page.locator('main').evaluate(el=>el===document.activeElement),true,file);
+        assert.equal(await page.locator('input:not([type=hidden]),select').evaluateAll(els=>els.every(el=>el.labels?.length || el.getAttribute('aria-label'))),true,file);
+      }
+      await page.setViewportSize({width:375,height:900});
+      await goto('index.html');
+      await page.keyboard.press('Tab'); await page.keyboard.press('Tab'); await page.keyboard.press('Tab');
+      assert.equal(await page.getByRole('button',{name:'Toggle navigation'}).evaluate(el=>el===document.activeElement),true);
+      await page.keyboard.press('Enter');
+      await page.locator('#navMenu.show').waitFor();
+      assert.equal(await page.getByRole('button',{name:'Toggle navigation'}).getAttribute('aria-expanded'),'true');
+      await page.keyboard.press('Tab');
+      assert.equal(await page.locator('#navMenu a').first().evaluate(el=>el===document.activeElement),true);
+      await page.keyboard.press('Shift+Tab'); await page.keyboard.press('Space');
+      await page.locator('#navMenu.show').waitFor({state:'hidden'});
+      await page.setViewportSize({width:1280,height:900});
+    });
+    await check('Keyboard cart quantity keeps forward focus; removal has a useful destination', async () => {
+      await goto('cart.html');
+      await page.evaluate(()=>localStorage.setItem('ss_cart',JSON.stringify([{id:'street',size:42,qty:1},{id:'runner',size:42,qty:1}])));
+      await page.reload();
+      await page.locator('[data-qty="0"]').focus();
+      await page.keyboard.press('ArrowUp'); await page.keyboard.press('Tab');
+      assert.equal(await page.locator('[data-remove="0"]').evaluate(el=>el===document.activeElement),true);
+      assert.match(await page.locator('.cart-summary').innerText(),/209[.,]97/);
+      await page.keyboard.press('Enter');
+      assert.equal(await page.locator('[data-remove="0"]').evaluate(el=>el===document.activeElement),true);
+      await page.keyboard.press('Enter');
+      assert.equal(await page.getByRole('link',{name:'Shop Shoes',exact:true}).evaluate(el=>el===document.activeElement),true);
+    });
+    await check('Keyboard account tabs, labelled registration and login/logout focus recovery', async () => {
+      await goto('login.html');
+      await page.getByRole('tab',{name:'Login',exact:true}).focus();
+      await page.keyboard.press('ArrowRight');
+      await page.locator('#registerPane.active').waitFor();
+      await page.locator('#regName').fill('Keyboard Test');
+      await page.locator('#regEmail').fill('keyboard@example.test');
+      await page.locator('#regPassword').fill('demo-pass-123');
+      await page.locator('#registerForm button').focus(); await page.keyboard.press('Enter');
+      assert.equal(await page.locator('#logoutBtn').evaluate(el=>el===document.activeElement),true);
+      await page.keyboard.press('Enter');
+      await page.getByRole('tab',{name:'Login',exact:true}).focus(); await page.keyboard.press('Enter');
+      await page.locator('#loginPane.active').waitFor();
+      await page.getByLabel('Email',{exact:true}).filter({visible:true}).fill('keyboard@example.test');
+      await page.locator('#loginPassword').fill('demo-pass-123');
+      await page.locator('#loginPassword').press('Enter');
+      assert.equal(await page.locator('#logoutBtn').evaluate(el=>el===document.activeElement),true);
+      await page.keyboard.press('Enter');
+      assert.equal(await page.locator('#loginEmail').evaluate(el=>el===document.activeElement),true);
+      await page.evaluate(()=>localStorage.clear());
+    });
+    await check('Product images reserve space; missing assets retain usable cards without retry loops', async () => {
+      let fallbackRequests=0;
+      await page.route('**/img/street.svg',route=>route.abort());
+      page.on('request',req=>{if(req.url().endsWith('/img/product-unavailable.svg')) fallbackRequests++;});
+      await goto('catalog.html');
+      const image=page.locator('img[alt^="Street Classic"]');
+      await image.scrollIntoViewIfNeeded();
+      await page.waitForFunction(()=>document.querySelector('img[alt^="Street Classic"]').naturalWidth>0 && document.querySelector('img[alt^="Street Classic"]').dataset.fallback==='true');
+      assert.match(await image.getAttribute('src'),/product-unavailable/);
+      assert.equal(await image.getAttribute('width'),'800');
+      assert.equal(await image.getAttribute('height'),'520');
+      assert.match(await image.getAttribute('alt'),/Street Classic.*unavailable/);
+      const card=image.locator('..');
+      assert.match(await card.innerText(),/Street Classic/);
+      assert.equal(await card.getByRole('link',{name:'View Details'}).getAttribute('href'),'product-detail.html?id=street');
+      await page.route('**/img/product-unavailable.svg',route=>route.abort());
+      await goto('product-detail.html?id=street');
+      await page.waitForFunction(()=>document.querySelector('[data-product-image]').dataset.fallback==='true');
+      assert.equal(await page.getByRole('button',{name:'Add to Cart'}).isVisible(),true);
+      assert.ok(fallbackRequests<=2,'fallback retried recursively');
+      await page.unroute('**/img/street.svg'); await page.unroute('**/img/product-unavailable.svg');
+    });
     await check('Homepage and all local navigation destinations load', async () => {
       await goto('index.html');
       assert.equal(await page.locator('#featuredProducts .product-card').count(), 3);
@@ -37,6 +118,7 @@ const server = http.createServer((req, res) => {
     await check('Six catalogue products, loaded images, categories and combined search', async () => {
       await goto('catalog.html');
       assert.equal(await page.locator('.product-card').count(),6);
+      for (const image of await page.locator('.product-image').all()) { await image.scrollIntoViewIfNeeded(); await image.evaluate(image=>image.decode()); }
       assert.equal(await page.locator('.product-image').evaluateAll(images => images.every(i=>i.complete && i.naturalWidth>0)),true);
       for(const [category,count] of [['Sneakers',2],['Running',2],['Formal',1],['Sandals',1]]) {
         await page.selectOption('#categoryFilter',category); assert.equal(await page.locator('.product-card').count(),count);
@@ -279,7 +361,7 @@ const server = http.createServer((req, res) => {
       assert.equal(await page.locator('#checkoutErrorsTitle').innerText(),'There is 1 problem');
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
       fs.mkdirSync(path.join(root,'test-results'),{recursive:true});
-      await page.screenshot({path:path.join(root,'test-results','checkout-validation-mobile.png'),fullPage:true});
+      await page.screenshot({path:path.join(evidence,'checkout-validation-mobile.png'),fullPage:true});
       await page.locator('#checkoutErrorList a').focus();
       await page.locator('#checkoutErrorList a').press('Enter');
       assert.equal(await page.getByLabel('Email',{exact:true}).evaluate(el=>el===document.activeElement),true);
@@ -325,8 +407,8 @@ const server = http.createServer((req, res) => {
       assert.equal(await page.locator('footer').isVisible(),false);
       assert.equal(await page.locator('.confirmation-actions').isVisible(),false);
       assert.equal(await page.locator('#confirmedItems table').isVisible(),true);
-      await page.pdf({path:path.join(root,'test-results','order-print-preview.pdf'),format:'A4',preferCSSPageSize:true});
-      await page.screenshot({path:path.join(root,'test-results','order-print-preview.png'),fullPage:true});
+      if (channel !== 'firefox') await page.pdf({path:path.join(evidence,'order-print-preview.pdf'),format:'A4',preferCSSPageSize:true});
+      await page.screenshot({path:path.join(evidence,'order-print-preview.png'),fullPage:true});
       await page.emulateMedia({media:'screen'});
     });
     await check('Legacy, absent and malformed orders never invent item details or execute saved markup', async () => {
@@ -358,7 +440,7 @@ const server = http.createServer((req, res) => {
       await page.emulateMedia({media:'print'});
       assert.equal(await page.locator('.order-items thead').evaluate(el=>getComputedStyle(el).display),'table-header-group');
       assert.equal(await page.locator('.order-items tbody tr').first().evaluate(el=>getComputedStyle(el).breakInside),'avoid');
-      await page.pdf({path:path.join(root,'test-results','order-print-long-preview.pdf'),format:'A4',preferCSSPageSize:true});
+      if (channel !== 'firefox') await page.pdf({path:path.join(evidence,'order-print-long-preview.pdf'),format:'A4',preferCSSPageSize:true});
       await page.emulateMedia({media:'screen'});
       await page.setViewportSize({width:1280,height:900});
       await goto('cart.html');
@@ -382,7 +464,7 @@ const server = http.createServer((req, res) => {
         const fits = await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth);
         if (!fits) {
           console.log(await page.locator('body *').evaluateAll(elements=>elements.filter(el=>el.getBoundingClientRect().right>innerWidth).map(el=>({tag:el.tagName,cls:el.className,width:el.getBoundingClientRect().width,right:el.getBoundingClientRect().right})).slice(0,20)));
-          await page.screenshot({path:path.join(root,'test-results','overflow.png'),fullPage:true});
+          await page.screenshot({path:path.join(evidence,'overflow.png'),fullPage:true});
         }
         assert.equal(fits,true, file+' overflows');
         if(width<992) {
@@ -390,10 +472,10 @@ const server = http.createServer((req, res) => {
           await page.locator('#navMenu.show').waitFor();
           assert.equal(await page.locator('#navMenu a[href="catalog.html"]').isVisible(),true);
         }
-        await page.screenshot({path:path.join(root,'test-results',`${width}-${file.split('?')[0]}.png`),fullPage:true});
+        await page.screenshot({path:path.join(evidence,`${width}-${file.split('?')[0]}.png`),fullPage:true});
       }
     });
     assert.deepEqual(errors,[]);
-    fs.writeFileSync(path.join(root,'test-results','results.json'),JSON.stringify({browser:await browser.version(),passed:results,pageErrors:errors},null,2));
+    fs.writeFileSync(path.join(evidence,'results.json'),JSON.stringify({browser:await browser.version(),passed:results,pageErrors:errors},null,2));
   } finally {await browser.close();server.close();}
 })().catch(error=>{console.error(error);server.close();process.exitCode=1;});
