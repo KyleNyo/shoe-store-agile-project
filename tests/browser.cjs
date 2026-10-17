@@ -88,6 +88,69 @@ const server = http.createServer((req, res) => {
       assert.match(await page.locator('#orderNumber').innerText(),/194[.,]97/);
       await goto('cart.html');assert.match(await page.locator('#cartArea').innerText(),/Your cart is empty/);
     });
+    await check('New orders retain item snapshots and printing preserves order and cart state', async () => {
+      await page.evaluate(()=>localStorage.setItem('ss_cart',JSON.stringify([{id:'street',size:42,qty:2},{id:'street',size:43,qty:1}])));
+      await goto('checkout.html');
+      await page.fill('#address','Test Street 1');await page.fill('#city','Test City');await page.fill('#postal','12345');await page.fill('#cardNumber','1111222233334444');
+      await page.locator('#checkoutForm button').click();await page.waitForURL('**/confirmation.html');
+      assert.equal(await page.locator('#confirmedItems tbody tr').count(),2);
+      assert.deepEqual(await page.locator('#confirmedItems tbody tr').first().locator('td').allTextContents(),['Street Classic','42','2','€64.99','€129.98']);
+      assert.deepEqual(await page.locator('#confirmedItems tbody tr').nth(1).locator('td').allTextContents(),['Street Classic','43','1','€64.99','€64.99']);
+      const before = await page.evaluate(()=>({order:localStorage.getItem('ss_last_order'),cart:localStorage.getItem('ss_cart')}));
+      const order = JSON.parse(before.order);
+      assert.deepEqual(Object.keys(order).sort(),['items','order','total']);
+      assert.deepEqual(Object.keys(order.items[0]).sort(),['name','qty','size','unitPriceCents']);
+      await page.evaluate(()=>{window.printCalls=0;window.print=()=>window.printCalls++;});
+      const print = page.getByRole('button',{name:'Print order summary',exact:true});
+      await print.focus(); await print.press('Enter');
+      assert.equal(await page.evaluate(()=>window.printCalls),1);
+      assert.deepEqual(await page.evaluate(()=>({order:localStorage.getItem('ss_last_order'),cart:localStorage.getItem('ss_cart')})),before);
+      await page.reload();
+      assert.equal(await page.locator('#confirmedItems tbody tr').count(),2);
+      fs.mkdirSync(path.join(root,'test-results'),{recursive:true});
+      await page.emulateMedia({media:'print'});
+      assert.equal(await page.locator('nav').isVisible(),false);
+      assert.equal(await page.locator('footer').isVisible(),false);
+      assert.equal(await page.locator('.confirmation-actions').isVisible(),false);
+      assert.equal(await page.locator('#confirmedItems table').isVisible(),true);
+      await page.pdf({path:path.join(root,'test-results','order-print-preview.pdf'),format:'A4',preferCSSPageSize:true});
+      await page.screenshot({path:path.join(root,'test-results','order-print-preview.png'),fullPage:true});
+      await page.emulateMedia({media:'screen'});
+    });
+    await check('Legacy, absent and malformed orders never invent item details or execute saved markup', async () => {
+      await page.evaluate(()=>localStorage.setItem('ss_last_order',JSON.stringify({order:'SS12345678',total:194.97})));
+      await goto('confirmation.html');
+      assert.match(await page.locator('#orderNumber').innerText(),/194[.,]97/);
+      assert.match(await page.locator('#confirmedItems').innerText(),/Item details are unavailable/);
+      assert.equal(await page.getByRole('button',{name:'Print order summary'}).isVisible(),true);
+      for (const value of ['{broken','null','{}','[]',JSON.stringify({order:'SS123',total:-1})]) {
+        await page.evaluate(value=>localStorage.setItem('ss_last_order',value),value);await page.reload();
+        assert.equal(await page.locator('#confirmationTitle').innerText(),'No saved order');
+        assert.equal(await page.locator('#printOrder').isVisible(),false);
+        assert.equal(await page.locator('#confirmedItems tbody tr').count(),0);
+      }
+      await page.evaluate(()=>localStorage.setItem('ss_last_order',JSON.stringify({order:'SS123',total:1,items:[{name:'<img src=x onerror=alert(1)>',size:42,qty:1,unitPriceCents:100}]})));
+      await page.reload();
+      assert.equal(await page.locator('#confirmedItems img').count(),0);
+      assert.match(await page.locator('#confirmedItems td').first().innerText(),/<img/);
+      await page.evaluate(()=>localStorage.setItem('ss_last_order',JSON.stringify({order:'SS123',total:5,items:[{name:'Example',size:42,qty:1,unitPriceCents:100}]})));
+      await page.reload();
+      assert.equal(await page.locator('#confirmedItems table').count(),0);
+      assert.match(await page.locator('#confirmedItems').innerText(),/Item details are unavailable/);
+    });
+    await check('Long order print layout repeats table headers and mobile confirmation does not overflow', async () => {
+      await page.evaluate(()=>localStorage.setItem('ss_last_order',JSON.stringify({order:'SS12345678',total:6499,items:Array.from({length:100},(_,i)=>({name:`Test shoe ${i+1}`,size:42,qty:1,unitPriceCents:6499}))})));
+      await page.reload();
+      await page.setViewportSize({width:375,height:900});
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+      await page.emulateMedia({media:'print'});
+      assert.equal(await page.locator('.order-items thead').evaluate(el=>getComputedStyle(el).display),'table-header-group');
+      assert.equal(await page.locator('.order-items tbody tr').first().evaluate(el=>getComputedStyle(el).breakInside),'avoid');
+      await page.pdf({path:path.join(root,'test-results','order-print-long-preview.pdf'),format:'A4',preferCSSPageSize:true});
+      await page.emulateMedia({media:'screen'});
+      await page.setViewportSize({width:1280,height:900});
+      await goto('cart.html');
+    });
     await check('Malformed saved cart cannot break navigation or target the wrong row', async () => {
       for(const value of ['{broken', '{}', 'null']) {
         await page.evaluate(value=>localStorage.setItem('ss_cart',value),value);await page.reload();

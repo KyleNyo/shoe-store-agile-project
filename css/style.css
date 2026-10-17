@@ -332,6 +332,23 @@ footer {
 .empty-state { padding:45px 20px; text-align:center; background:var(--gray-light); border-radius:12px; }
 .form-control:focus,.form-select:focus { border-color:var(--primary); box-shadow:0 0 0 .2rem rgba(255,122,0,.15); }
 .order-summary { background:var(--primary-light); border-radius:12px; padding:20px; }
+.order-items { min-width:520px; }
+.order-items td { overflow-wrap:anywhere; }
+@media print {
+  @page { size:A4; margin:16mm; }
+  body:has(#confirmationArea) { background:#fff; color:#000; }
+  body:has(#confirmationArea) nav,
+  body:has(#confirmationArea) footer,
+  .confirmation-actions { display:none !important; }
+  body:has(#confirmationArea) section.container { width:100%; max-width:none; margin:0 !important; padding:0; }
+  #confirmationArea { padding:0; background:#fff; }
+  #confirmedItems { overflow:visible; }
+  .order-items { width:100%; min-width:0; table-layout:fixed; }
+  .order-items caption { caption-side:top; }
+  .order-items thead { display:table-header-group; }
+  .order-items tr { break-inside:avoid; }
+  #orderNumber { break-inside:avoid; }
+}
 
 /* Cart controls remain usable inside the mobile table scroll area. */
 .cart-quantity { width: 80px; }
