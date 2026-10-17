@@ -447,7 +447,13 @@ function initCheckout() {
 
     const order = "SS" + Date.now().toString().slice(-8);
 
-    write("ss_last_order", { order, total });
+    const items = c.map(row => ({
+      name: row.p.name,
+      size: row.size,
+      qty: row.qty,
+      unitPriceCents: Math.round(row.p.price * 100)
+    }));
+    write("ss_last_order", { order, total, items });
     write("ss_cart", []);
 
     location.href = "confirmation.html";
@@ -461,10 +467,56 @@ function renderConfirmation() {
   if (!el) return;
 
   const o = read("ss_last_order", null);
+  const details = document.getElementById("confirmedItems");
+  const printButton = document.getElementById("printOrder");
+  const validOrder = o && typeof o === "object" && typeof o.order === "string" &&
+    o.order.trim() && Number.isFinite(o.total) && o.total >= 0 &&
+    Number.isSafeInteger(Math.round(o.total * 100));
 
-  el.textContent = o
-    ? `Order ${o.order} • Total ${euro(o.total)}`
-    : "Order confirmed";
+  if (!validOrder) {
+    document.getElementById("confirmationTitle").textContent = "No saved order";
+    document.getElementById("confirmationMessage").textContent = "There is no saved order summary in this browser.";
+    el.textContent = "";
+    return;
+  }
+
+  el.textContent = `Order ${o.order} • Total ${euro(o.total)}`;
+  const validItems = Array.isArray(o.items) && o.items.length > 0 && o.items.every(item =>
+    item && typeof item.name === "string" && item.name.trim() &&
+    Number.isInteger(item.size) && item.size > 0 &&
+    Number.isInteger(item.qty) && item.qty >= 1 && item.qty <= MAX_QUANTITY &&
+    Number.isSafeInteger(item.unitPriceCents) && item.unitPriceCents >= 0 &&
+    Number.isSafeInteger(item.unitPriceCents * item.qty)
+  );
+  const sum = validItems ? o.items.reduce((total, item) => total + item.unitPriceCents * item.qty, 0) : null;
+
+  if (validItems && sum === Math.round(o.total * 100)) {
+    const table = document.createElement("table");
+    table.className = "table order-items text-start";
+    const caption = table.createCaption();
+    caption.textContent = "Items in this simulated order";
+    const head = table.createTHead().insertRow();
+    ["Product", "EU size", "Quantity", "Unit price", "Subtotal"].forEach(label => {
+      const cell = document.createElement("th");
+      cell.scope = "col";
+      cell.textContent = label;
+      head.append(cell);
+    });
+    const body = table.createTBody();
+    o.items.forEach(item => {
+      const row = body.insertRow();
+      [item.name, item.size, item.qty, euro(item.unitPriceCents / 100),
+        euro(item.unitPriceCents * item.qty / 100)].forEach(value => {
+        row.insertCell().textContent = value;
+      });
+    });
+    details.append(table);
+  } else {
+    details.textContent = "Item details are unavailable for this saved order. The recorded total is shown above.";
+  }
+
+  printButton.hidden = false;
+  printButton.addEventListener("click", () => window.print());
 }
 
 document.addEventListener("DOMContentLoaded", () => {
