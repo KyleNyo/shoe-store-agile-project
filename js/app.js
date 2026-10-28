@@ -315,8 +315,35 @@ function initCheckout() {
 
   document.getElementById("checkoutSummary").innerHTML = `<h5>Order Summary</h5>${c.map(x => `<div class="d-flex justify-content-between"><span>${x.p.name} × ${x.qty}</span><span>${euro(subtotalCents(x) / 100)}</span></div>`).join("")}<hr><div class="d-flex justify-content-between fw-bold"><span>Total</span><span>${euro(total)}</span></div>`;
 
+  // Compare the reviewed cart, not just its total: different sizes can cost the same.
+  const cartSnapshot = JSON.stringify(c.map(({ id, size, qty }) => ({ id, size, qty })));
+  let checkoutBlocked = false;
+
+  const blockCheckout = message => {
+    checkoutBlocked = true;
+    content.style.display = "none";
+    guard.innerHTML = `<div class="alert alert-warning">${message}</div>`;
+    guard.setAttribute("role", "alert");
+    guard.setAttribute("tabindex", "-1");
+    guard.focus();
+    updateNav();
+  };
+
   form.onsubmit = e => {
     e.preventDefault();
+
+    if (checkoutBlocked) return;
+
+    // Another tab may have changed the account or cart since this page loaded.
+    const currentUser = user();
+    if (!currentUser || currentUser.email !== u.email) {
+      blockCheckout('Your account has changed. <a href="login.html">Check your account</a>, then return to checkout. No order was placed.');
+      return;
+    }
+    if (JSON.stringify(cart()) !== cartSnapshot) {
+      blockCheckout('Your cart has changed. <a href="cart.html">Review your cart</a> before checking out again. No order was placed.');
+      return;
+    }
 
     const num = document.getElementById("cardNumber").value.replace(/\s/g, "");
 
@@ -329,6 +356,7 @@ function initCheckout() {
 
     write("ss_last_order", { order, total });
     write("ss_cart", []);
+    checkoutBlocked = true;
 
     location.href = "confirmation.html";
   };
