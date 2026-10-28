@@ -99,6 +99,65 @@ const server = http.createServer((req, res) => {
       await page.locator('[data-remove="0"]').click();assert.match(await page.locator('#cartArea').innerText(),/Your cart is empty/);
     });
     fs.mkdirSync(path.join(root,'test-results'),{recursive:true});
+    await check('Undo restores removed sizes, quantities and totals, including the last item', async () => {
+      await goto('cart.html');
+      await page.evaluate(() => localStorage.setItem('ss_cart',JSON.stringify([
+        {id:'street',size:42,qty:2},{id:'street',size:43,qty:1}
+      ])));
+      await page.reload();
+      await page.locator('[data-remove="0"]').click();
+      assert.match(await page.locator('#cartRecoveryMessage').innerText(),/Street Classic, size 42, removed/);
+      await page.locator('#undoCartRemoval').focus();
+      await page.locator('#undoCartRemoval').press('Enter');
+      assert.equal(await page.locator('tbody tr').count(),2);
+      assert.equal(await page.locator('[data-qty="0"]').inputValue(),'2');
+      assert.match(await page.locator('.cart-summary').innerText(),/194[.,]97/);
+      assert.equal(await page.locator('[data-cart-count]').innerText(),'3');
+      assert.equal(await page.locator('#undoCartRemoval').isVisible(),false);
+      await page.locator('[data-remove="1"]').click();
+      await page.locator('[data-remove="0"]').click();
+      assert.match(await page.locator('#cartArea').innerText(),/Your cart is empty/);
+      await page.setViewportSize({width:375,height:900});
+      assert.equal(await page.locator('#undoCartRemoval').isVisible(),true);
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth<=innerWidth),true);
+      await page.screenshot({path:path.join(root,'test-results','cart-undo-mobile.png'),fullPage:true});
+      await page.locator('#undoCartRemoval').click();
+      assert.equal(await page.locator('tbody tr').count(),1);
+      assert.match(await page.locator('.cart-summary').innerText(),/129[.,]98/);
+      await page.reload();
+      assert.equal(await page.locator('#undoCartRemoval').isVisible(),false);
+    });
+    await check('Two-tab cart change cancels stale Undo without losing new items', async () => {
+      await page.locator('[data-remove="0"]').click();
+      const other = await context.newPage();
+      other.on('dialog', dialog => dialog.accept());
+      try {
+        await other.goto(base+'/product-detail.html?id=trail');
+        await other.selectOption('#shoeSize','46');await other.click('#addBtn');
+        await page.locator('#undoCartRemoval').click();
+        assert.match(await page.locator('#cartRecoveryMessage').innerText(),/Nothing was restored/);
+        assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem('ss_cart'))),[{id:'trail',size:46,qty:1}]);
+        assert.equal(await page.locator('tbody tr').count(),1);
+        assert.match(await page.locator('tbody tr').innerText(),/Trail Motion/);
+      } finally { await other.close(); }
+    });
+    await check('Checkout distinguishes sizes and provides a working Edit cart link', async () => {
+      await page.evaluate(() => {
+        localStorage.setItem('ss_user',JSON.stringify({name:'Review Test',email:'review@example.test'}));
+        localStorage.setItem('ss_cart',JSON.stringify([{id:'street',size:42,qty:2},{id:'street',size:43,qty:1}]));
+      });
+      await goto('checkout.html');
+      const lines = page.locator('.checkout-line');
+      assert.equal(await lines.count(),2);
+      assert.match(await lines.nth(0).innerText(),/Size 42 · Quantity 2/);
+      assert.match(await lines.nth(1).innerText(),/Size 43 · Quantity 1/);
+      assert.match(await page.locator('#checkoutSummary').innerText(),/194[.,]97/);
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth<=innerWidth),true);
+      await page.screenshot({path:path.join(root,'test-results','checkout-size-review-mobile.png'),fullPage:true});
+      await page.getByRole('link',{name:'Edit cart',exact:true}).click();
+      await page.waitForURL('**/cart.html');
+      assert.equal(await page.locator('tbody tr').count(),2);
+    });
     for(const width of [375,768,1440]) await check(`Layout and navigation at ${width}px`, async () => {
       await page.setViewportSize({width,height:900});
       await page.evaluate(()=>localStorage.setItem('ss_cart',JSON.stringify([{id:'street',size:42,qty:2}])));

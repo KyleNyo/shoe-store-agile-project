@@ -26,3 +26,52 @@ test('adding an unavailable product or size cannot corrupt the cart', () => {
   run("addToCart('missing',42)"); run("addToCart('street',100)");
   assert.deepEqual(run('cart()'), []);
 });
+
+test('undo restores the exact size, quantity, position and total once', () => {
+  const initial = [{id:'runner',size:40,qty:1},{id:'street',size:42,qty:2},{id:'street',size:43,qty:1}];
+  const run = app(initial);
+  const total = run('totalPrice(cartRows())');
+  assert.equal(run("removeCartItem('street',42)"),true);
+  assert.deepEqual(run('cart()'),[initial[0],initial[2]]);
+  assert.equal(run('undoCartRemoval()'),'restored');
+  assert.deepEqual(run('cart()'),initial);
+  assert.equal(run('totalPrice(cartRows())'),total);
+  assert.equal(run('undoCartRemoval()'),'unavailable');
+  assert.deepEqual(run('cart()'),initial);
+});
+
+test('last-item removal is recoverable; only the latest removal is restored', () => {
+  const run = app([{id:'street',size:42,qty:2},{id:'runner',size:40,qty:1}]);
+  run("removeCartItem('street',42)");
+  run("removeCartItem('runner',40)");
+  assert.deepEqual(run('cart()'),[]);
+  assert.equal(run('undoCartRemoval()'),'restored');
+  assert.deepEqual(run('cart()'),[{id:'runner',size:40,qty:1}]);
+});
+
+for (const [name, change] of [
+  ['another cart update', "write('ss_cart',[{id:'trail',size:46,qty:3}])"],
+  ['malformed saved cart', "localStorage.setItem('ss_cart','{broken')"],
+  ['account switch', "write('ss_user',{name:'Other',email:'other@example.test'})"],
+  ['logout', "write('ss_user',null)"],
+  ['a completed order in another tab', "write('ss_last_order',{order:'new',total:64.99})"]
+]) {
+  test(`undo refuses to overwrite ${name}`, () => {
+    const run = app([{id:'street',size:42,qty:2}]);
+    run("write('ss_user',{name:'Test',email:'test@example.test'})");
+    run("removeCartItem('street',42)");
+    run(change);
+    const before = run("[localStorage.getItem('ss_cart'),localStorage.getItem('ss_user'),localStorage.getItem('ss_last_order')]");
+    assert.equal(run('undoCartRemoval()'),'changed');
+    assert.deepEqual(run("[localStorage.getItem('ss_cart'),localStorage.getItem('ss_user'),localStorage.getItem('ss_last_order')]"),before);
+    assert.equal(run('undoCartRemoval()'),'unavailable');
+  });
+}
+
+test('removing an absent row leaves current cart intact', () => {
+  const initial = [{id:'street',size:42,qty:2}];
+  const run = app(initial);
+  assert.equal(run("removeCartItem('street',43)"),false);
+  assert.deepEqual(run('cart()'),initial);
+  assert.equal(run('undoCartRemoval()'),'unavailable');
+});
