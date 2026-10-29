@@ -2,7 +2,7 @@ name: Store tests
 
 on:
   push:
-    branches: [main, integrated-demo]
+    branches: [main, integrated-demo, efe/presentation-integration]
   pull_request:
   workflow_dispatch:
 
