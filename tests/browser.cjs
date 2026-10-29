@@ -651,6 +651,7 @@ const server = http.createServer((req, res) => {
       assert.equal(new URL(catalogURL).searchParams.get('campaign'),'demo');
       await page.locator('#productGrid a').first().click();
       await page.waitForURL('**/product-detail.html?*');
+      assert.equal(await page.locator('#shoeSize').inputValue(),'42');
       await page.locator('#returnToCatalog').click();
       await page.waitForURL('**/catalog.html?*');
       await page.locator('#productGrid .product-card').first().waitFor();

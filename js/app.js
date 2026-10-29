@@ -275,6 +275,10 @@ function renderDetail() {
 
   el.innerHTML = `<div class="row g-4"><div class="col-md-6">${productImage(p, true)}</div><div class="col-md-6"><span class="badge badge-orange">${p.category}</span><h2 class="mt-2">${p.name}</h2><p>${p.description}</p><p class="price">${euro(p.price)}</p><label class="form-label" for="shoeSize">Size</label><select id="shoeSize" class="form-select mb-3">${p.sizes.map(s => `<option>${s}</option>`).join("")}</select><button id="addBtn" class="btn btn-primary">Add to Cart</button></div></div>`;
 
+  const selectedSize = safeState.get("size");
+  if (selectedSize !== null && p.sizes.includes(Number(selectedSize))) {
+    document.getElementById("shoeSize").value = String(Number(selectedSize));
+  }
   document.getElementById("addBtn").onclick = () => addToCart(p.id, document.getElementById("shoeSize").value);
 }
 
