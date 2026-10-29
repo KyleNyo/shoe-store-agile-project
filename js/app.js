@@ -465,9 +465,36 @@ function initCheckout() {
     if (submitted) validate();
   }));
 
+  // Compare the reviewed cart, not just its total: different sizes can cost the same.
+  const cartSnapshot = JSON.stringify(c.map(({ id, size, qty }) => ({ id, size, qty })));
+  let checkoutBlocked = false;
+
+  const blockCheckout = message => {
+    checkoutBlocked = true;
+    content.style.display = "none";
+    guard.innerHTML = `<div class="alert alert-warning">${message}</div>`;
+    guard.setAttribute("role", "alert");
+    guard.setAttribute("tabindex", "-1");
+    guard.focus();
+    updateNav();
+  };
+
   form.onsubmit = e => {
     e.preventDefault();
     submitted = true;
+
+    if (checkoutBlocked) return;
+
+    // Another tab may have changed the account or cart since this page loaded.
+    const currentUser = user();
+    if (!currentUser || currentUser.email !== u.email) {
+      blockCheckout('Your account has changed. <a href="login.html">Check your account</a>, then return to checkout. No order was placed.');
+      return;
+    }
+    if (JSON.stringify(cart()) !== cartSnapshot) {
+      blockCheckout('Your cart has changed. <a href="cart.html">Review your cart</a> before checking out again. No order was placed.');
+      return;
+    }
 
     if (!validate()) {
       errorSummary.focus();
@@ -484,6 +511,7 @@ function initCheckout() {
     }));
     write("ss_last_order", { order, total, items });
     write("ss_cart", []);
+    checkoutBlocked = true;
 
     location.href = "confirmation.html";
   };

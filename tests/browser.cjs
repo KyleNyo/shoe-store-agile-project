@@ -456,6 +456,56 @@ const server = http.createServer((req, res) => {
       await page.locator('[data-remove="0"]').click();assert.match(await page.locator('#cartArea').innerText(),/Your cart is empty/);
     });
     fs.mkdirSync(path.join(root,'test-results'),{recursive:true});
+    await check('Two-tab checkout rejects changed carts and permits reviewed retry', async () => {
+      await goto('cart.html');
+      await page.evaluate(() => {
+        localStorage.setItem('ss_user', JSON.stringify({name:'Checkout Test',email:'checkout@example.test'}));
+        localStorage.setItem('ss_cart', JSON.stringify([{id:'street',size:42,qty:1}]));
+      });
+      await goto('checkout.html');
+      await page.fill('#address','Test Street 1');await page.fill('#city','Test City');
+      await page.fill('#postal','12345');await page.fill('#cardNumber','1111222233334444');
+      const previousOrder = await page.evaluate(() => localStorage.getItem('ss_last_order'));
+      const other = await context.newPage();
+      try {
+        await other.goto(base+'/cart.html');
+        await other.locator('[data-qty="0"]').fill('2');await other.locator('[data-qty="0"]').press('Tab');
+        await page.locator('#checkoutForm button').click();
+        assert.match(page.url(),/checkout.html$/);
+        assert.match(await page.locator('#checkoutGuard').innerText(),/cart has changed/);
+        assert.equal(await page.locator('#checkoutGuard').evaluate(el => el === document.activeElement),true);
+        assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('ss_cart'))[0].qty),2);
+        assert.equal(await page.evaluate(() => localStorage.getItem('ss_last_order')),previousOrder);
+        await page.setViewportSize({width:375,height:900});
+        assert.equal(await page.evaluate(() => document.documentElement.scrollWidth<=innerWidth),true);
+        await page.screenshot({path:path.join(root,'test-results','checkout-stale-cart.png'),fullPage:true});
+        await page.locator('#checkoutGuard a').click();
+        await page.locator('a[href="checkout.html"]').click();
+        assert.match(await page.locator('#checkoutSummary').innerText(),/129[.,]98/);
+        await page.fill('#address','Test Street 1');await page.fill('#city','Test City');
+        await page.fill('#postal','12345');await page.fill('#cardNumber','1111222233334444');
+        await page.locator('#checkoutForm button').click();await page.waitForURL('**/confirmation.html');
+        assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('ss_last_order')).total),129.98);
+      } finally { await other.close(); }
+    });
+    await check('Two-tab logout blocks checkout without changing cart or previous order', async () => {
+      await page.evaluate(() => localStorage.setItem('ss_cart', JSON.stringify([{id:'street',size:42,qty:1}])));
+      await goto('checkout.html');
+      await page.fill('#address','Test Street 1');await page.fill('#city','Test City');
+      await page.fill('#postal','12345');await page.fill('#cardNumber','1111222233334444');
+      const previousOrder = await page.evaluate(() => localStorage.getItem('ss_last_order'));
+      const other = await context.newPage();
+      try {
+        await other.goto(base+'/login.html');await other.click('#logoutBtn');
+        await page.locator('#checkoutForm button').click();
+        assert.match(page.url(),/checkout.html$/);
+        assert.match(await page.locator('#checkoutGuard').innerText(),/account has changed/);
+        assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('ss_cart'))[0].qty),1);
+        assert.equal(await page.evaluate(() => localStorage.getItem('ss_last_order')),previousOrder);
+        assert.equal(await page.locator('#checkoutGuard a').getAttribute('href'),'login.html');
+      } finally { await other.close(); }
+      await page.evaluate(() => localStorage.setItem('ss_user', JSON.stringify({name:'Checkout Test',email:'checkout@example.test'})));
+    });
     for(const width of [375,768,1440]) await check(`Layout and navigation at ${width}px`, async () => {
       await page.setViewportSize({width,height:900});
       await page.evaluate(()=>localStorage.setItem('ss_cart',JSON.stringify([{id:'street',size:42,qty:2}])));
