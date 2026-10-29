@@ -538,6 +538,7 @@ const server = http.createServer((req, res) => {
     });
     await check('Two-tab cart change cancels stale Undo without losing new items', async () => {
       await page.locator('[data-remove="0"]').click();
+      await page.locator('#undoCartRemoval').focus();
       const other = await context.newPage();
       other.on('dialog', dialog => dialog.accept());
       try {
@@ -545,6 +546,7 @@ const server = http.createServer((req, res) => {
         await other.selectOption('#shoeSize','46');await other.click('#addBtn');
         await page.getByText('Your cart or account changed in another tab. Undo is no longer available; the current cart is shown below.',{exact:true}).waitFor();
         assert.equal(await page.locator('#undoCartRemoval').isVisible(),false);
+        assert.equal(await page.locator('#cartRecovery').evaluate(el=>el===document.activeElement),true);
         assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem('ss_cart'))),[{id:'trail',size:46,qty:1}]);
         assert.equal(await page.locator('tbody tr').count(),1);
         assert.match(await page.locator('tbody tr').innerText(),/Trail Motion/);

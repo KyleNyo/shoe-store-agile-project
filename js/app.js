@@ -449,6 +449,8 @@ function initCartSync() {
     if (label) {
       const target = [...area.querySelectorAll("[aria-label]")].find(el => el.getAttribute("aria-label") === label);
       (target || document.getElementById("cartRecovery")).focus();
+    } else if (active?.id === "undoCartRemoval") {
+      document.getElementById("cartRecovery").focus();
     }
   });
 }
