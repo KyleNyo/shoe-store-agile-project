@@ -1,6 +1,6 @@
 {
   "name": "solestyle-sprint-2",
   "private": true,
-  "scripts": { "test": "node --test tests/cart.test.cjs tests/checkout.test.cjs", "test:browser": "node tests/browser.cjs" },
+  "scripts": { "start": "node tools/serve.cjs", "test": "node --test tests/cart.test.cjs tests/checkout.test.cjs", "test:browser": "node tests/browser.cjs" },
   "devDependencies": { "playwright": "1.62.1" }
 }

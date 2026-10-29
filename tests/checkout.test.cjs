@@ -10,14 +10,17 @@ function checkout() {
   const data = new Map(Object.entries({ ss_cart: originalCart, ss_user: account, ss_last_order: savedOrder })
     .map(([key, value]) => [key, JSON.stringify(value)]));
   const elements = Object.fromEntries(['checkoutForm', 'checkoutGuard', 'checkoutContent', 'fullName',
-    'checkoutEmail', 'checkoutSummary', 'cardNumber'].map(id => [id, {
-      style: {}, value: id === 'cardNumber' ? '1111222233334444' : '', innerHTML: '',
-      setAttribute() {}, focus() {}
+    'checkoutEmail', 'checkoutSummary', 'cardNumber', 'address', 'city', 'postal',
+    'checkoutErrors', 'checkoutErrorList', 'checkoutErrorsTitle'].map(id => [id, {
+      id, style: {}, value: id === 'cardNumber' ? '1111222233334444' : 'Test', innerHTML: '',
+      validity: { typeMismatch: false }, classList: { toggle() {} },
+      setAttribute() {}, getAttribute() { return ''; }, removeAttribute() {},
+      after() {}, addEventListener() {}, replaceChildren() {}, focus() {}
     }]));
   const location = { href: 'checkout.html' };
   const context = vm.createContext({ Intl, URLSearchParams, location, alert() {},
     localStorage: { getItem: key => data.get(key) ?? null, setItem: (key, value) => data.set(key, value) },
-    document: { addEventListener() {}, getElementById: id => elements[id], querySelectorAll: () => [], querySelector: () => null }
+    document: { addEventListener() {}, createElement: () => ({}), getElementById: id => elements[id], querySelectorAll: () => [], querySelector: () => null }
   });
   vm.runInContext(fs.readFileSync('js/app.js', 'utf8'), context);
   vm.runInContext('initCheckout()', context);
