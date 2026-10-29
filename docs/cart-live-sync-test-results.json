@@ -30,6 +30,7 @@
     "Checkout distinguishes sizes and provides a working Edit cart link",
     "Other-tab quantity and removal update the current cart and keep useful focus",
     "Storage failure preserves quantity, totals and removal; retry succeeds",
+    "Failed checkout saves preserve cart/order and allow a successful retry",
     "Layout and navigation at 375px",
     "Layout and navigation at 768px",
     "Layout and navigation at 1440px"

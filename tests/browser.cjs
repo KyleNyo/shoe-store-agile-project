@@ -611,6 +611,33 @@ const server = http.createServer((req, res) => {
       await page.locator('#undoCartRemoval').click();
       assert.equal(await page.locator('tbody tr').count(),1);
     });
+    await check('Failed checkout saves preserve cart/order and allow a successful retry', async () => {
+      for (const failedKey of ['ss_last_order','ss_cart']) {
+        await page.evaluate(()=>localStorage.setItem('ss_cart',JSON.stringify([{id:'street',size:42,qty:1}])));
+        await goto('checkout.html');
+        await page.fill('#address','Test Street 1');await page.fill('#city','Test City');
+        await page.fill('#postal','12345');await page.fill('#cardNumber','1111222233334444');
+        const previous=await page.evaluate(()=>localStorage.getItem('ss_last_order'));
+        await page.evaluate(key=>{
+          const original=Storage.prototype.setItem;let failOnce=true;
+          Storage.prototype.setItem=function(k,v){
+            if(k===key&&failOnce){failOnce=false;throw new DOMException('Full','QuotaExceededError');}
+            return original.call(this,k,v);
+          };
+          window.restoreStorage=()=>{Storage.prototype.setItem=original;};
+        },failedKey);
+        await page.locator('#checkoutForm button').click();
+        assert.match(page.url(),/checkout.html$/);
+        assert.match(await page.locator('#checkoutGuard').innerText(),/could not be saved/);
+        assert.equal(await page.evaluate(()=>localStorage.getItem('ss_last_order')),previous);
+        assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('ss_cart'))[0].qty),1);
+        assert.equal(await page.locator('#address').inputValue(),'Test Street 1');
+        await page.evaluate(()=>{window.restoreStorage();delete window.restoreStorage;});
+        await page.locator('#checkoutForm button').click();await page.waitForURL('**/confirmation.html');
+        assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('ss_last_order')).total),64.99);
+        assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('ss_cart'))),[]);
+      }
+    });
     for(const width of [375,768,1440]) await check(`Layout and navigation at ${width}px`, async () => {
       await page.setViewportSize({width,height:900});
       await page.evaluate(()=>localStorage.setItem('ss_cart',JSON.stringify([{id:'street',size:42,qty:2}])));

@@ -11,7 +11,7 @@ Cart add, quantity, removal and Undo writes now catch failed saves. The user see
 an actionable storage message; saved items/totals remain unchanged. Failed Undo
 retains its recovery record for retry. The existing checkout state guard remains.
 
-Verification: 22 Node tests and 32 local Edge browser groups passed. New coverage
+Verification: 25 Node tests and 33 local Edge browser groups passed. New coverage
 checks real two-tab quantity/removal changes, totals/counts, focus, stale Undo,
 failed cart writes and retry. Existing 18 page/viewport checks and all catalogue,
 account, checkout and print scenarios pass; no JavaScript page errors.
@@ -22,6 +22,12 @@ and verify the first updates without reload. For failed-save tests the browser
 suite injects QuotaExceededError for cart writes only, then restores storage and
 checks a successful retry.
 
-Scope is cart editing. Account/checkout persistence is unchanged. localStorage
-does not provide atomic multi-tab transactions. These tests do not establish
-team review, a merge or deployment.
+Checkout save failures are also handled: if saving the order or clearing its
+cart fails, checkout stays on the form and attempts to restore the previous order.
+A recovered failure retains form values and permits retry. If restoring the
+previous order also fails, retry is blocked with an explicit incomplete-state
+message and a route to review the cart. Tests inject both failure points and a
+failed rollback. No successful confirmation is displayed after a failed save.
+
+Account persistence is unchanged. localStorage does not provide atomic multi-tab
+transactions. These tests do not establish team review, a merge or deployment.

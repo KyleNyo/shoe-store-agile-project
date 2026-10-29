@@ -596,8 +596,32 @@ function initCheckout() {
       qty: row.qty,
       unitPriceCents: Math.round(row.p.price * 100)
     }));
-    write("ss_last_order", { order, total, items });
-    write("ss_cart", []);
+    let previousOrder;
+    let orderSaved = false;
+    try {
+      previousOrder = localStorage.getItem("ss_last_order");
+      write("ss_last_order", { order, total, items });
+      orderSaved = true;
+      write("ss_cart", []);
+    } catch {
+      let recovered = !orderSaved;
+      if (orderSaved) {
+        try {
+          if (previousOrder === null) localStorage.removeItem("ss_last_order");
+          else localStorage.setItem("ss_last_order", previousOrder);
+          recovered = true;
+        } catch { /* Storage can become unavailable during recovery as well. */ }
+      }
+      if (!recovered) {
+        blockCheckout('Checkout could not finish saving, and the previous order record could not be restored. <a href="cart.html">Review your cart</a> before trying again.');
+      } else {
+        guard.textContent = "Your order could not be saved. Your cart and previous order were kept. Please allow browser storage or free up space, then try again.";
+        guard.setAttribute("role", "alert");
+        guard.setAttribute("tabindex", "-1");
+        guard.focus();
+      }
+      return;
+    }
     checkoutBlocked = true;
 
     location.href = "confirmation.html";
