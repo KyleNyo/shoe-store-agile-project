@@ -319,6 +319,51 @@ function cartRows() {
   }).filter(x => x.p);
 }
 
+// One-step, page-session recovery. Never restore over a newer cart or order.
+let pendingCartRemoval = null;
+
+function removeCartItem(id, size) {
+  const before = cart();
+  const removed = before.find(row => row.id === id && row.size === size);
+  if (!removed) return false;
+  const after = before.filter(row => row !== removed);
+  write("ss_cart", after);
+  pendingCartRemoval = {
+    before, removed,
+    cart: localStorage.getItem("ss_cart"),
+    account: JSON.stringify(user()),
+    order: localStorage.getItem("ss_last_order")
+  };
+  return true;
+}
+
+function undoCartRemoval() {
+  const pending = pendingCartRemoval;
+  pendingCartRemoval = null;
+  if (!pending) return "unavailable";
+  if (localStorage.getItem("ss_cart") !== pending.cart ||
+      JSON.stringify(user()) !== pending.account ||
+      localStorage.getItem("ss_last_order") !== pending.order) return "changed";
+  write("ss_cart", pending.before);
+  return "restored";
+}
+
+function showCartRecovery(message) {
+  const notice = document.getElementById("cartRecovery");
+  if (!notice) return;
+  document.getElementById("cartRecoveryMessage").textContent = message;
+  const undo = document.getElementById("undoCartRemoval");
+  undo.hidden = !pendingCartRemoval;
+  undo.onclick = () => {
+    const result = undoCartRemoval();
+    renderCart();
+    updateNav();
+    showCartRecovery(result === "restored" ? "Item restored to your cart." :
+      "Your cart or account has changed. Nothing was restored; please review your current cart.");
+    notice.focus();
+  };
+}
+
 function renderCart() {
   const el = document.getElementById("cartArea");
   if (!el) return;
@@ -358,11 +403,14 @@ function renderCart() {
   el.querySelectorAll("[data-remove]").forEach(button => button.onclick = () => {
     const selected = rows[Number(button.dataset.remove)];
 
-    write("ss_cart", cart().filter(row => row.id !== selected.id || row.size !== selected.size));
+    const removed = removeCartItem(selected.id, selected.size);
 
     const nextIndex = Number(button.dataset.remove);
     renderCart();
     updateNav();
+    showCartRecovery(removed ? `${selected.p.name}, size ${selected.size}, removed. You can undo this removal while this page stays open.` :
+      "This item is no longer in your cart. Your current cart is shown below.");
+
     const remaining = el.querySelectorAll("[data-remove]");
     (remaining[Math.min(nextIndex, remaining.length - 1)] || el.querySelector("a")).focus();
   });
@@ -394,7 +442,7 @@ function initCheckout() {
 
   const total = totalPrice(c);
 
-  document.getElementById("checkoutSummary").innerHTML = `<h5>Order Summary</h5>${c.map(x => `<div class="d-flex justify-content-between"><span>${x.p.name} × ${x.qty}</span><span>${euro(subtotalCents(x) / 100)}</span></div>`).join("")}<hr><div class="d-flex justify-content-between fw-bold"><span>Total</span><span>${euro(total)}</span></div>`;
+  document.getElementById("checkoutSummary").innerHTML = `<h5>Order Summary</h5>${c.map(x => `<div class="d-flex justify-content-between gap-2 mb-3 checkout-line"><div><strong>${x.p.name}</strong><div class="small text-muted">Size ${x.size} · Quantity ${x.qty}</div><div class="small text-muted">${euro(x.p.price)} each</div></div><span class="text-nowrap">${euro(subtotalCents(x) / 100)}</span></div>`).join("")}<hr><div class="d-flex justify-content-between fw-bold"><span>Total</span><span>${euro(total)}</span></div><a href="cart.html" class="btn btn-outline-primary btn-sm mt-3">Edit cart</a>`;
 
   const errorSummary = document.getElementById("checkoutErrors");
   const errorList = document.getElementById("checkoutErrorList");
