@@ -1,7 +1,6 @@
 # SCRUM-52 — Cart recovery and checkout review
 
-Implemented 28 October 2026 for Erdogan Efe Demir (`Tiger1234562`), with
-AI-assisted implementation and testing. Branch: `efe/cart-review-recovery`.
+Implemented 28 October 2026 for Erdogan Efe Demir (`Tiger1234562`). Branch: `efe/cart-review-recovery`.
 Base: main `6fcac23`. This is a separate contribution awaiting review/merge.
 
 ## Customer behavior
