@@ -1,10 +1,10 @@
-# SCRUM-53–56 — Combined follow-up
+# SCRUM-53–57 — Combined follow-up
 
 PR #11 now includes PR #12's catalogue return work, preserving its original
 commit history. Review the combined change in PR #11. Main remains the accepted
 Sprint 3 baseline until this follow-up is merged.
 
-Combined local verification: 30 Node tests and 37 Edge browser groups passed,
+Combined local verification: 30 Node tests and 39 Edge browser groups passed,
 including 18 page/viewport combinations and no JavaScript page errors. Evidence:
 docs/followup-integration-test-results.json.
 
@@ -29,6 +29,15 @@ for events that have not arrived. Unchanged or unrelated storage updates leave
 checkout usable. Five additional Node cases cover these event/restoration
 conditions; the two-tab browser flows now verify rejection before submission
 and successful retry after reviewing the current cart.
+
+SCRUM-57 adds Download order summary beside Print. A UTF-8 plain text file
+contains the displayed order's number, verified item sizes/quantities/prices,
+total and simulated-purchase disclaimer. No customer or payment fields are
+exported. Downloading preserves cart/order storage and keyboard focus, and
+retains the displayed snapshot if another tab replaces the latest order.
+Legacy/inconsistent items receive an explicit unavailable-details notice;
+missing/invalid orders offer no download. Two new browser groups verify actual
+downloaded bytes, legacy/mismatch handling and keyboard use.
 
 Start with npm start. Demo: select Sneakers, size 42, EUR 60–80 and descending
 price. Open a product, verify size 42 is selected, and return to the unchanged

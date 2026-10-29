@@ -449,6 +449,43 @@ const server = http.createServer((req, res) => {
       await page.screenshot({path:path.join(evidence,'order-print-preview.png'),fullPage:true});
       await page.emulateMedia({media:'screen'});
     });
+    await check('Keyboard download exports displayed order sizes and totals without changing storage', async () => {
+      const order={order:'SS-export-test',total:194.97,items:[
+        {name:'Street Classic',size:42,qty:2,unitPriceCents:6499},
+        {name:'Street Classic',size:43,qty:1,unitPriceCents:6499}
+      ]};
+      await page.evaluate(order=>localStorage.setItem('ss_last_order',JSON.stringify(order)),order);
+      await goto('confirmation.html');
+      // The screen and export must agree if the latest saved order later changes.
+      await page.evaluate(()=>localStorage.setItem('ss_last_order',JSON.stringify({order:'newer-order',total:1})));
+      const before=await page.evaluate(()=>({order:localStorage.getItem('ss_last_order'),cart:localStorage.getItem('ss_cart')}));
+      await page.locator('#downloadOrder').focus();
+      const [download]=await Promise.all([page.waitForEvent('download'),page.keyboard.press('Enter')]);
+      assert.equal(download.suggestedFilename(),'SoleStyle-order-summary.txt');
+      const text=fs.readFileSync(await download.path(),'utf8');
+      assert.match(text,/Order: SS-export-test/);
+      assert.match(text,/EU size 42 \| Quantity 2 \| Unit price €64.99 \| Subtotal €129.98/);
+      assert.match(text,/EU size 43 \| Quantity 1/);
+      assert.match(text,/Total: €194.97/);
+      assert.match(text,/not a payment receipt/);
+      assert.doesNotMatch(text,/newer-order|cardNumber|address|email/i);
+      assert.deepEqual(await page.evaluate(()=>({order:localStorage.getItem('ss_last_order'),cart:localStorage.getItem('ss_cart')})),before);
+      assert.equal(await page.locator('#downloadOrder').evaluate(el=>el===document.activeElement),true);
+      await download.saveAs(path.join(evidence,'SoleStyle-order-summary.txt'));
+    });
+    await check('Order downloads disclose unavailable legacy or inconsistent items and hide for absent orders', async () => {
+      for(const order of [{order:'legacy',total:5},{order:'mismatch',total:5,items:[{name:'Unverified item',size:42,qty:1,unitPriceCents:100}]}]) {
+        await page.evaluate(order=>localStorage.setItem('ss_last_order',JSON.stringify(order)),order);
+        await goto('confirmation.html');
+        const [download]=await Promise.all([page.waitForEvent('download'),page.locator('#downloadOrder').click()]);
+        const text=fs.readFileSync(await download.path(),'utf8');
+        assert.match(text,/Item details are unavailable/);
+        assert.match(text,/Total: €5.00/);
+        assert.doesNotMatch(text,/Unverified item/);
+      }
+      await page.evaluate(()=>localStorage.removeItem('ss_last_order'));await page.reload();
+      assert.equal(await page.locator('#downloadOrder').count(),0);
+    });
     await check('Legacy, absent and malformed orders never invent item details or execute saved markup', async () => {
       await page.evaluate(()=>localStorage.setItem('ss_last_order',JSON.stringify({order:'SS12345678',total:194.97})));
       await goto('confirmation.html');

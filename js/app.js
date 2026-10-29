@@ -731,7 +731,8 @@ function renderConfirmation() {
   );
   const sum = validItems ? o.items.reduce((total, item) => total + item.unitPriceCents * item.qty, 0) : null;
 
-  if (validItems && sum === Math.round(o.total * 100)) {
+  const hasItemDetails = validItems && sum === Math.round(o.total * 100);
+  if (hasItemDetails) {
     const table = document.createElement("table");
     table.className = "table order-items text-start";
     const caption = table.createCaption();
@@ -758,6 +759,31 @@ function renderConfirmation() {
 
   printButton.hidden = false;
   printButton.addEventListener("click", () => window.print());
+
+  // Export the displayed snapshot, even if another tab replaces the latest order.
+  const summary = ["SoleStyle — Simulated order summary", `Order: ${o.order}`, "",
+    ...(hasItemDetails ? o.items.map(item =>
+      `${item.name} | EU size ${item.size} | Quantity ${item.qty} | Unit price ${euro(item.unitPriceCents / 100)} | Subtotal ${euro(item.unitPriceCents * item.qty / 100)}`)
+      : ["Item details are unavailable for this saved order."]),
+    "", `Total: ${euro(o.total)}`, "",
+    "Student project: simulated purchase. This is not a payment receipt."
+  ].join("\r\n");
+  const downloadButton = document.createElement("button");
+  downloadButton.id = "downloadOrder";
+  downloadButton.type = "button";
+  downloadButton.className = "btn btn-outline-primary";
+  downloadButton.textContent = "Download order summary";
+  downloadButton.onclick = () => {
+    const url = URL.createObjectURL(new Blob([summary], { type: "text/plain;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "SoleStyle-order-summary.txt";
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  printButton.after(downloadButton);
 }
 
 document.addEventListener("DOMContentLoaded", () => {

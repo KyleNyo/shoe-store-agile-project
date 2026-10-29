@@ -22,6 +22,8 @@
     "Checkout rejects whitespace-only fields and invalid simulated cards with mobile error recovery",
     "Integrated simulated checkout preserves total and empties cart",
     "New orders retain item snapshots and printing preserves order and cart state",
+    "Keyboard download exports displayed order sizes and totals without changing storage",
+    "Order downloads disclose unavailable legacy or inconsistent items and hide for absent orders",
     "Legacy, absent and malformed orders never invent item details or execute saved markup",
     "Long order print layout repeats table headers and mobile confirmation does not overflow",
     "Malformed saved cart cannot break navigation or target the wrong row",
