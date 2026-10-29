@@ -627,22 +627,34 @@ function initCheckout() {
     updateNav();
   };
 
+  const reviewedCheckoutIsCurrent = () => {
+    const currentUser = user();
+    if (!currentUser || currentUser.email !== u.email) {
+      blockCheckout('Your account has changed. <a href="login.html">Check your account</a>, then return to checkout. No order was placed.');
+      return false;
+    }
+    if (JSON.stringify(cart()) !== cartSnapshot) {
+      blockCheckout('Your cart has changed. <a href="cart.html">Review your cart</a> before checking out again. No order was placed.');
+      return false;
+    }
+    return !checkoutBlocked;
+  };
+
+  window.addEventListener("storage", event => {
+    if (event.storageArea === localStorage && [null, "ss_cart", "ss_user"].includes(event.key)) {
+      reviewedCheckoutIsCurrent();
+    }
+  });
+  window.addEventListener("pageshow", event => {
+    if (event.persisted) reviewedCheckoutIsCurrent();
+  });
+
   form.onsubmit = e => {
     e.preventDefault();
     submitted = true;
 
-    if (checkoutBlocked) return;
-
-    // Another tab may have changed the account or cart since this page loaded.
-    const currentUser = user();
-    if (!currentUser || currentUser.email !== u.email) {
-      blockCheckout('Your account has changed. <a href="login.html">Check your account</a>, then return to checkout. No order was placed.');
-      return;
-    }
-    if (JSON.stringify(cart()) !== cartSnapshot) {
-      blockCheckout('Your cart has changed. <a href="cart.html">Review your cart</a> before checking out again. No order was placed.');
-      return;
-    }
+    // Also check at submission, even if a storage event has not arrived yet.
+    if (!reviewedCheckoutIsCurrent()) return;
 
     if (!validate()) {
       errorSummary.focus();

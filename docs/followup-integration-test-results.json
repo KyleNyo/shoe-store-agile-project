@@ -25,7 +25,7 @@
     "Legacy, absent and malformed orders never invent item details or execute saved markup",
     "Long order print layout repeats table headers and mobile confirmation does not overflow",
     "Malformed saved cart cannot break navigation or target the wrong row",
-    "Two-tab checkout rejects changed carts and permits reviewed retry",
+    "Two-tab checkout immediately hides stale totals and permits reviewed retry",
     "Two-tab logout blocks checkout without changing cart or previous order",
     "Undo restores removed sizes, quantities and totals, including the last item",
     "Two-tab cart change cancels stale Undo without losing new items",

@@ -494,7 +494,7 @@ const server = http.createServer((req, res) => {
       await page.locator('[data-remove="0"]').click();assert.match(await page.locator('#cartArea').innerText(),/Your cart is empty/);
     });
     fs.mkdirSync(path.join(root,'test-results'),{recursive:true});
-    await check('Two-tab checkout rejects changed carts and permits reviewed retry', async () => {
+    await check('Two-tab checkout immediately hides stale totals and permits reviewed retry', async () => {
       await goto('cart.html');
       await page.evaluate(() => {
         localStorage.setItem('ss_user', JSON.stringify({name:'Checkout Test',email:'checkout@example.test'}));
@@ -508,7 +508,8 @@ const server = http.createServer((req, res) => {
       try {
         await other.goto(base+'/cart.html');
         await other.locator('[data-qty="0"]').fill('2');await other.locator('[data-qty="0"]').press('Tab');
-        await page.locator('#checkoutForm button').click();
+        await page.getByText('Your cart has changed.',{exact:false}).waitFor();
+        assert.equal(await page.locator('#checkoutContent').isVisible(),false);
         assert.match(page.url(),/checkout.html$/);
         assert.match(await page.locator('#checkoutGuard').innerText(),/cart has changed/);
         assert.equal(await page.locator('#checkoutGuard').evaluate(el => el === document.activeElement),true);
@@ -537,7 +538,8 @@ const server = http.createServer((req, res) => {
       const other = await context.newPage();
       try {
         await other.goto(base+'/login.html');await other.click('#logoutBtn');
-        await page.locator('#checkoutForm button').click();
+        await page.getByText('Your account has changed.',{exact:false}).waitFor();
+        assert.equal(await page.locator('#checkoutContent').isVisible(),false);
         assert.match(page.url(),/checkout.html$/);
         assert.match(await page.locator('#checkoutGuard').innerText(),/account has changed/);
         assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('ss_cart'))[0].qty),1);

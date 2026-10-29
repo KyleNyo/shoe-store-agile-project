@@ -1,10 +1,10 @@
-# SCRUM-53, SCRUM-54 and SCRUM-55 — Combined follow-up
+# SCRUM-53–56 — Combined follow-up
 
 PR #11 now includes PR #12's catalogue return work, preserving its original
 commit history. Review the combined change in PR #11. Main remains the accepted
 Sprint 3 baseline until this follow-up is merged.
 
-Combined local verification: 25 Node tests and 37 Edge browser groups passed,
+Combined local verification: 30 Node tests and 37 Edge browser groups passed,
 including 18 page/viewport combinations and no JavaScript page errors. Evidence:
 docs/followup-integration-test-results.json.
 
@@ -20,6 +20,15 @@ focus stays on Add to Cart, and Tab reaches the new link. Quantity limits and
 failed writes replace old success feedback without changing the saved cart.
 Cart-page write errors retain their existing alert behavior. Two browser groups
 cover repeated adds, keyboard navigation, the quantity cap and failed storage.
+
+SCRUM-56 immediately invalidates checkout when another tab changes the reviewed
+cart or account. The stale summary and form are hidden; a focused notice links
+to cart/account review. Cached-page restoration rechecks the snapshot too,
+including completed checkout sessions. Submission still checks independently
+for events that have not arrived. Unchanged or unrelated storage updates leave
+checkout usable. Five additional Node cases cover these event/restoration
+conditions; the two-tab browser flows now verify rejection before submission
+and successful retry after reviewing the current cart.
 
 Start with npm start. Demo: select Sneakers, size 42, EUR 60–80 and descending
 price. Open a product, verify size 42 is selected, and return to the unchanged
