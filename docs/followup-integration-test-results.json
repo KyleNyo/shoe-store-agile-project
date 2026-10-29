@@ -1,6 +1,8 @@
 {
   "browser": "156.0.4314.50",
   "passed": [
+    "Product adds show saved size and quantity inline without interrupting keyboard use",
+    "Product add cap and storage failure replace stale success without changing saved cart",
     "Keyboard skip links, visible focus, labelled controls and mobile menu",
     "Keyboard cart quantity keeps forward focus; removal has a useful destination",
     "Keyboard account tabs, labelled registration and login/logout focus recovery",

@@ -24,12 +24,12 @@ const write = (k, v) => localStorage.setItem(k, JSON.stringify(v));
 const user = () => read("ss_user", null);
 const MAX_QUANTITY = 99;
 
-function saveCart(items) {
+function saveCart(items, onError = alert) {
   try {
     write("ss_cart", items);
     return true;
   } catch {
-    alert("Your cart could not be saved. Please allow browser storage or free up space, then try again.");
+    onError("Your cart could not be saved. Please allow browser storage or free up space, then try again.");
     return false;
   }
 }
@@ -95,20 +95,29 @@ function addToCart(id, size) {
 
   if (!product || !product.sizes.includes(size)) return;
 
+  const feedback = (message, success = false) => {
+    const status = document.getElementById?.("addCartStatus");
+    if (!status) { alert(message); return; }
+    status.textContent = message;
+    status.className = success ? "text-success mt-3" : "text-danger mt-3";
+    document.getElementById("viewCartLink").hidden = !success;
+  };
+
   const c = cart();
   const existing = c.find(item => item.id === id && item.size === size);
 
   if (existing && existing.qty >= MAX_QUANTITY) {
-    alert(`You can add up to ${MAX_QUANTITY} pairs of each size.`);
+    feedback(`You can add up to ${MAX_QUANTITY} pairs of each size. Your cart has not changed.`);
     return;
   }
 
   if (existing) existing.qty++;
   else c.push({ id, size, qty: 1 });
 
-  if (!saveCart(c)) return;
+  if (!saveCart(c, feedback)) return;
   updateNav();
-  alert("Added to cart.");
+  const quantity = c.find(item => item.id === id && item.size === size).qty;
+  feedback(`${product.name}, size ${size}, added to cart. ${quantity} ${quantity === 1 ? "pair" : "pairs"} of this size in your cart.`, true);
 }
 
 function initHomeSearch() {
@@ -276,6 +285,17 @@ function renderDetail() {
   el.innerHTML = `<div class="row g-4"><div class="col-md-6">${productImage(p, true)}</div><div class="col-md-6"><span class="badge badge-orange">${p.category}</span><h2 class="mt-2">${p.name}</h2><p>${p.description}</p><p class="price">${euro(p.price)}</p><label class="form-label" for="shoeSize">Size</label><select id="shoeSize" class="form-select mb-3">${p.sizes.map(s => `<option>${s}</option>`).join("")}</select><button id="addBtn" class="btn btn-primary">Add to Cart</button></div></div>`;
 
   const selectedSize = safeState.get("size");
+  const status = document.createElement("p");
+  status.id = "addCartStatus";
+  status.setAttribute("role", "status");
+  status.setAttribute("aria-atomic", "true");
+  const viewCart = document.createElement("a");
+  viewCart.id = "viewCartLink";
+  viewCart.href = "cart.html";
+  viewCart.className = "btn btn-outline-primary";
+  viewCart.textContent = "View cart";
+  viewCart.hidden = true;
+  document.getElementById("addBtn").after(status, viewCart);
   if (selectedSize !== null && p.sizes.includes(Number(selectedSize))) {
     document.getElementById("shoeSize").value = String(Number(selectedSize));
   }

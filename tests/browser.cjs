@@ -30,6 +30,44 @@ const server = http.createServer((req, res) => {
   const check = async(name, fn) => {await fn(); results.push(name); console.log('PASS ' + name);};
   const goto = file => page.goto(base + '/' + file);
   try {
+    await check('Product adds show saved size and quantity inline without interrupting keyboard use', async () => {
+      await goto('product-detail.html?id=street');
+      await page.evaluate(()=>localStorage.clear());
+      await page.reload();
+      assert.equal(await page.locator('#viewCartLink').isVisible(),false);
+      await page.locator('#shoeSize').selectOption('42');
+      await page.locator('#addBtn').focus();
+      await page.keyboard.press('Enter');
+      assert.match(await page.locator('#addCartStatus').innerText(),/Street Classic, size 42.*1 pair/);
+      assert.equal(await page.locator('#addCartStatus').getAttribute('role'),'status');
+      assert.equal(await page.locator('#addBtn').evaluate(el=>el===document.activeElement),true);
+      await page.keyboard.press('Enter');
+      assert.match(await page.locator('#addCartStatus').innerText(),/2 pairs/);
+      assert.equal(await page.locator('[data-cart-count]').first().innerText(),'2');
+      await page.keyboard.press('Tab');
+      assert.equal(await page.locator('#viewCartLink').evaluate(el=>el===document.activeElement),true);
+      await page.keyboard.press('Enter');
+      await page.waitForURL(/cart\.html$/);
+      assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('ss_cart'))),[{id:'street',size:42,qty:2}]);
+    });
+    await check('Product add cap and storage failure replace stale success without changing saved cart', async () => {
+      await goto('product-detail.html?id=street');
+      await page.evaluate(()=>localStorage.setItem('ss_cart',JSON.stringify([{id:'street',size:39,qty:98}])));
+      await page.reload();
+      await page.locator('#addBtn').click();
+      assert.match(await page.locator('#addCartStatus').innerText(),/99 pairs/);
+      await page.locator('#addBtn').click();
+      assert.match(await page.locator('#addCartStatus').innerText(),/cart has not changed/);
+      assert.equal(await page.locator('#viewCartLink').isVisible(),false);
+      await page.locator('#shoeSize').selectOption('42');
+      await page.evaluate(()=>{Storage.prototype.setItem=function(){throw new Error('Storage full');};});
+      await page.locator('#addBtn').click();
+      assert.match(await page.locator('#addCartStatus').innerText(),/could not be saved/);
+      assert.equal(await page.locator('#viewCartLink').isVisible(),false);
+      assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('ss_cart'))),[{id:'street',size:39,qty:99}]);
+      await page.reload();
+      await page.evaluate(()=>localStorage.clear());
+    });
     await check('Keyboard skip links, visible focus, labelled controls and mobile menu', async () => {
       for (const file of ['index.html','catalog.html','product-detail.html?id=street','cart.html','login.html','checkout.html']) {
         await goto(file);
