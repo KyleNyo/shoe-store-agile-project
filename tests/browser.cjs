@@ -629,6 +629,35 @@ const server = http.createServer((req, res) => {
         assert.match(await page.locator('tbody tr').innerText(),/Trail Motion/);
       } finally { await other.close(); }
     });
+    await check('Cached cart restoration refreshes saved rows and navigation and invalidates stale Undo', async () => {
+      await goto('cart.html');
+      await page.evaluate(()=>{
+        localStorage.setItem('ss_user',JSON.stringify({name:'Restore Test',email:'restore@example.test'}));
+        localStorage.setItem('ss_cart',JSON.stringify([{id:'street',size:42,qty:1},{id:'runner',size:43,qty:1}]));
+      });
+      await page.reload();
+      await page.locator('[data-remove="0"]').click();
+      await page.locator('#undoCartRemoval').focus();
+      const saved=await page.evaluate(()=>{
+        // Simulate writes missed while a document was in the back/forward cache.
+        localStorage.setItem('ss_cart',JSON.stringify([{id:'trail',size:46,qty:2}]));
+        localStorage.removeItem('ss_user');
+        window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:false}));
+        return {cart:localStorage.getItem('ss_cart'),order:localStorage.getItem('ss_last_order')};
+      });
+      assert.match(await page.locator('#cartArea').innerText(),/Velocity Runner/);
+      await page.evaluate(()=>window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true})));
+      assert.match(await page.locator('#cartArea').innerText(),/Trail Motion/);
+      assert.doesNotMatch(await page.locator('#cartArea').innerText(),/Velocity Runner/);
+      assert.equal(await page.locator('[data-qty="0"]').inputValue(),'2');
+      assert.equal(await page.locator('[data-cart-count]').innerText(),'2');
+      assert.equal(await page.locator('[data-auth-link]').innerText(),'Login');
+      assert.equal(await page.locator('#undoCartRemoval').isVisible(),false);
+      assert.match(await page.locator('#cartRecoveryMessage').innerText(),/refreshed after returning/);
+      assert.equal(await page.locator('#cartRecovery').evaluate(el=>el===document.activeElement),true);
+      assert.deepEqual(await page.evaluate(()=>({cart:localStorage.getItem('ss_cart'),order:localStorage.getItem('ss_last_order')})),saved);
+      await page.evaluate(()=>localStorage.setItem('ss_user',JSON.stringify({name:'Checkout Test',email:'checkout@example.test'})));
+    });
     await check('Checkout distinguishes sizes and provides a working Edit cart link', async () => {
       await page.evaluate(() => {
         localStorage.setItem('ss_user',JSON.stringify({name:'Review Test',email:'review@example.test'}));

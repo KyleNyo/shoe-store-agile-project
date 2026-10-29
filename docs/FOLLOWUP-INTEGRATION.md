@@ -1,10 +1,10 @@
-# SCRUM-53–57 — Combined follow-up
+# SCRUM-53–58 — Combined follow-up
 
 PR #11 now includes PR #12's catalogue return work, preserving its original
 commit history. Review the combined change in PR #11. Main remains the accepted
 Sprint 3 baseline until this follow-up is merged.
 
-Combined local verification: 30 Node tests and 39 Edge browser groups passed,
+Combined local verification: 30 Node tests and 40 Edge browser groups passed,
 including 18 page/viewport combinations and no JavaScript page errors. Evidence:
 docs/followup-integration-test-results.json.
 
@@ -38,6 +38,14 @@ retains the displayed snapshot if another tab replaces the latest order.
 Legacy/inconsistent items receive an explicit unavailable-details notice;
 missing/invalid orders offer no download. Two new browser groups verify actual
 downloaded bytes, legacy/mismatch handling and keyboard use.
+
+SCRUM-58 reuses live cart refresh on persisted pageshow so a cached document
+does not keep outdated rows, totals or navigation after missing storage events.
+Restoration discards stale Undo and moves focus to the recovery notice when
+needed. This path only reads storage. The new browser group simulates missed
+writes and dispatches persisted/non-persisted PageTransitionEvents; it checks
+saved rows, counts, account navigation, Undo, focus and unchanged stored data.
+It exercises the restoration handler, not a browser's cache eviction policy.
 
 Start with npm start. Demo: select Sneakers, size 42, EUR 60–80 and descending
 price. Open a product, verify size 42 is selected, and return to the unchanged

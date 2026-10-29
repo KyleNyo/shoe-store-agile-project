@@ -495,8 +495,7 @@ function renderCart() {
 }
 
 function initCartSync() {
-  window.addEventListener("storage", event => {
-    if (event.storageArea !== localStorage || ![null, "ss_cart", "ss_user", "ss_last_order"].includes(event.key)) return;
+  const refresh = (restored = false) => {
     updateNav();
     const area = document.getElementById("cartArea");
     if (!area) return;
@@ -505,14 +504,25 @@ function initCartSync() {
     const hadUndo = Boolean(pendingCartRemoval);
     pendingCartRemoval = null;
     renderCart();
-    showCartRecovery(hadUndo ? "Your cart or account changed in another tab. Undo is no longer available; the current cart is shown below." :
-      "Updated from another tab. Your current cart is shown below.");
+    const message = restored
+      ? "Cart refreshed after returning to this page. Review your current items below." + (hadUndo ? " Undo is no longer available." : "")
+      : hadUndo ? "Your cart or account changed in another tab. Undo is no longer available; the current cart is shown below."
+        : "Updated from another tab. Your current cart is shown below.";
+    showCartRecovery(message);
     if (label) {
       const target = [...area.querySelectorAll("[aria-label]")].find(el => el.getAttribute("aria-label") === label);
       (target || document.getElementById("cartRecovery")).focus();
     } else if (active?.id === "undoCartRemoval") {
       document.getElementById("cartRecovery").focus();
     }
+  };
+  window.addEventListener("storage", event => {
+    if (event.storageArea !== localStorage || ![null, "ss_cart", "ss_user", "ss_last_order"].includes(event.key)) return;
+    refresh();
+  });
+  // Cached pages may have missed storage events while they were suspended.
+  window.addEventListener("pageshow", event => {
+    if (event.persisted) refresh(true);
   });
 }
 

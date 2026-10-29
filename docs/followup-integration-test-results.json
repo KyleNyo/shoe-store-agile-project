@@ -31,6 +31,7 @@
     "Two-tab logout blocks checkout without changing cart or previous order",
     "Undo restores removed sizes, quantities and totals, including the last item",
     "Two-tab cart change cancels stale Undo without losing new items",
+    "Cached cart restoration refreshes saved rows and navigation and invalidates stale Undo",
     "Checkout distinguishes sizes and provides a working Edit cart link",
     "Other-tab quantity and removal update the current cart and keep useful focus",
     "Storage failure preserves quantity, totals and removal; retry succeeds",
