@@ -160,7 +160,24 @@ function renderCatalog() {
     search.value = searchQuery;
   }
 
+  const params = new URLSearchParams(location.search);
+  for (const [key, control] of [["sort", sort], ["size", sizeFilter]]) {
+    const value = params.get(key);
+    if (value !== null && [...control.options].some(option => option.value === value)) control.value = value;
+  }
+  minPrice.value = params.get("min") || "";
+  maxPrice.value = params.get("max") || "";
+
   const run = () => {
+    const url = new URL(location.href);
+    const controls = [["search", search.value], ["category", filter.value === "All" ? "" : filter.value],
+      ["sort", sort.value === "default" ? "" : sort.value], ["min", minPrice.value],
+      ["max", maxPrice.value], ["size", sizeFilter.value]];
+    for (const [key, value] of controls) {
+      if (value) url.searchParams.set(key, value);
+      else url.searchParams.delete(key);
+    }
+    history.replaceState(history.state, "", url);
     const term = search.value.trim().toLowerCase();
     const cat = filter.value;
     const minimum = minPrice.value === "" ? null : Math.round(Number(minPrice.value) * 100);
@@ -193,6 +210,13 @@ function renderCatalog() {
     }
 
     grid.innerHTML = list.map(card).join("");
+    grid.querySelectorAll('a[href^="product-detail.html"]').forEach(link => {
+      const detail = new URL(link.href);
+      const state = new URLSearchParams();
+      for (const [key, value] of controls) if (value) state.set(key, value);
+      if (state.size) detail.searchParams.set("catalog", state.toString());
+      link.setAttribute("href", "product-detail.html" + detail.search);
+    });
 
     message.innerHTML = list.length
       ? ""
@@ -230,6 +254,19 @@ function renderDetail() {
   if (!el) return;
 
   const p = PRODUCTS.find(x => x.id === new URLSearchParams(location.search).get("id"));
+
+  // Only carry known catalogue controls; never accept a destination URL.
+  const state = new URLSearchParams(new URLSearchParams(location.search).get("catalog") || "");
+  const safeState = new URLSearchParams();
+  for (const key of ["search", "category", "sort", "min", "max", "size"]) {
+    if (state.has(key)) safeState.set(key, state.get(key));
+  }
+  const back = document.createElement("a");
+  back.id = "returnToCatalog";
+  back.className = "btn btn-outline-primary mb-3";
+  back.textContent = "Back to catalogue";
+  back.href = "catalog.html" + (safeState.size ? "?" + safeState.toString() : "");
+  el.before(back);
 
   if (!p) {
     el.innerHTML = '<div class="alert alert-warning">Product not found.</div>';

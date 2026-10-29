@@ -638,6 +638,46 @@ const server = http.createServer((req, res) => {
         assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('ss_cart'))),[]);
       }
     });
+    await check('Product return and reload preserve all catalogue controls and matching order', async () => {
+      await goto('catalog.html?campaign=demo#products');
+      await page.selectOption('#categoryFilter','Sneakers');
+      await page.selectOption('#priceSort','price-desc');
+      await page.selectOption('#sizeFilter','42');
+      await page.fill('#minPrice','60');await page.fill('#maxPrice','80');
+      await page.fill('#productSearch','sneaker');
+      const names=await page.locator('.product-card h5').allTextContents();
+      assert.equal(names.length,2);
+      const catalogURL=page.url();
+      assert.equal(new URL(catalogURL).searchParams.get('campaign'),'demo');
+      await page.locator('#productGrid a').first().click();
+      await page.waitForURL('**/product-detail.html?*');
+      await page.locator('#returnToCatalog').click();
+      await page.waitForURL('**/catalog.html?*');
+      await page.locator('#productGrid .product-card').first().waitFor();
+      for(const [id,value] of [['categoryFilter','Sneakers'],['priceSort','price-desc'],['sizeFilter','42'],['minPrice','60'],['maxPrice','80'],['productSearch','sneaker']]) {
+        assert.equal(await page.locator('#'+id).inputValue(),value);
+      }
+      assert.deepEqual(await page.locator('.product-card h5').allTextContents(),names);
+      await page.reload();
+      assert.deepEqual(await page.locator('.product-card h5').allTextContents(),names);
+      await page.locator('#resetFilters').click();await page.reload();
+      assert.equal(await page.locator('.product-card').count(),6);
+      for(const key of ['search','category','sort','size','min','max']) assert.equal(new URL(page.url()).searchParams.has(key),false);
+    });
+    await check('Direct or malformed product return state cannot navigate outside the catalogue', async () => {
+      for(const suffix of ['', '?id=missing&catalog='+encodeURIComponent('destination=https://example.com&sort=invalid&size=999'), '?id=street&catalog='+encodeURIComponent('search=<img src=x onerror=alert(1)>&category=Invalid&sort=invalid&size=999')]) {
+        await goto('product-detail.html'+suffix);
+        const target=new URL(await page.locator('#returnToCatalog').getAttribute('href'),page.url());
+        assert.equal(target.origin,new URL(base).origin);
+        assert.equal(target.pathname,'/catalog.html');
+        assert.equal(target.searchParams.has('destination'),false);
+        await page.locator('#returnToCatalog').click();
+        await page.waitForURL('**/catalog.html*');
+        assert.equal(await page.locator('#priceSort').inputValue(),'default');
+        assert.equal(await page.locator('#sizeFilter').inputValue(),'');
+        assert.equal(await page.locator('#categoryFilter').inputValue(),'All');
+      }
+    });
     for(const width of [375,768,1440]) await check(`Layout and navigation at ${width}px`, async () => {
       await page.setViewportSize({width,height:900});
       await page.evaluate(()=>localStorage.setItem('ss_cart',JSON.stringify([{id:'street',size:42,qty:2}])));
