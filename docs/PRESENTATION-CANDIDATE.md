@@ -4,7 +4,7 @@ Branch `efe/presentation-integration` combines the existing PR #7 demo
 (`18eecee`), PR #8 checkout guard (`13dbfe4`) and PR #9 cart recovery (`9f26ec4`).
 It is a review candidate, not a merged or team-approved release. Original
 branches and main are preserved. Merge commits retain original attribution;
-integration fixes are by Erdogan Efe Demir, with AI assistance.
+integration fixes are by Erdogan Efe Demir.
 
 ## Start the demo
 

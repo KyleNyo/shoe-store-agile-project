@@ -1,7 +1,7 @@
 # SCRUM-51 — Checkout state consistency
 
 Date: 28 October 2026. Individual contribution: Erdogan Efe Demir
-(`Tiger1234562`), with AI-assisted implementation and testing.
+(`Tiger1234562`).
 
 ## Verified defect
 
