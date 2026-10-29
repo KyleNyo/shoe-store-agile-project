@@ -543,8 +543,8 @@ const server = http.createServer((req, res) => {
       try {
         await other.goto(base+'/product-detail.html?id=trail');
         await other.selectOption('#shoeSize','46');await other.click('#addBtn');
-        await page.locator('#undoCartRemoval').click();
-        assert.match(await page.locator('#cartRecoveryMessage').innerText(),/Nothing was restored/);
+        await page.getByText('Your cart or account changed in another tab. Undo is no longer available; the current cart is shown below.',{exact:true}).waitFor();
+        assert.equal(await page.locator('#undoCartRemoval').isVisible(),false);
         assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem('ss_cart'))),[{id:'trail',size:46,qty:1}]);
         assert.equal(await page.locator('tbody tr').count(),1);
         assert.match(await page.locator('tbody tr').innerText(),/Trail Motion/);
@@ -566,6 +566,48 @@ const server = http.createServer((req, res) => {
       await page.getByRole('link',{name:'Edit cart',exact:true}).click();
       await page.waitForURL('**/cart.html');
       assert.equal(await page.locator('tbody tr').count(),2);
+    });
+    await check('Other-tab quantity and removal update the current cart and keep useful focus', async () => {
+      const other = await context.newPage();
+      try {
+        await other.goto(base+'/cart.html');
+        await page.locator('[data-qty="0"]').focus();
+        await other.locator('[data-qty="0"]').fill('3');await other.locator('[data-qty="0"]').press('Tab');
+        await page.waitForFunction(() => document.querySelector('[data-qty="0"]').value === '3');
+        assert.match(await page.locator('.cart-summary').innerText(),/259[.,]96/);
+        assert.equal(await page.locator('[data-cart-count]').innerText(),'4');
+        assert.equal(await page.locator('[data-qty="0"]').evaluate(el=>el===document.activeElement),true);
+        await other.locator('[data-remove="0"]').click();
+        await page.waitForFunction(() => document.querySelectorAll('tbody tr').length === 1);
+        assert.equal(await page.locator('[data-cart-count]').innerText(),'1');
+        assert.match(await page.locator('.cart-summary').innerText(),/64[.,]99/);
+      } finally { await other.close(); }
+    });
+    await check('Storage failure preserves quantity, totals and removal; retry succeeds', async () => {
+      const dialogs=[]; const record=dialog=>dialogs.push(dialog.message());page.on('dialog',record);
+      await page.evaluate(() => {
+        window.restoreStorage = Storage.prototype.setItem;
+        Storage.prototype.setItem = function(key,value) {
+          if(key==='ss_cart') throw new DOMException('Full','QuotaExceededError');
+          return window.restoreStorage.call(this,key,value);
+        };
+      });
+      try {
+        await page.locator('[data-qty="0"]').fill('4');await page.locator('[data-qty="0"]').press('Tab');
+        assert.equal(await page.locator('[data-qty="0"]').inputValue(),'1');
+        assert.match(await page.locator('.cart-summary').innerText(),/64[.,]99/);
+        await page.locator('[data-remove="0"]').click();
+        assert.equal(await page.locator('tbody tr').count(),1);
+        assert.equal(await page.locator('#undoCartRemoval').isVisible(),false);
+        assert.equal(dialogs.length,2); assert.ok(dialogs.every(message=>/could not be saved/.test(message)));
+      } finally {
+        await page.evaluate(()=>{Storage.prototype.setItem=window.restoreStorage;delete window.restoreStorage;});
+        page.off('dialog',record);
+      }
+      await page.locator('[data-remove="0"]').click();
+      assert.match(await page.locator('#cartArea').innerText(),/Your cart is empty/);
+      await page.locator('#undoCartRemoval').click();
+      assert.equal(await page.locator('tbody tr').count(),1);
     });
     for(const width of [375,768,1440]) await check(`Layout and navigation at ${width}px`, async () => {
       await page.setViewportSize({width,height:900});

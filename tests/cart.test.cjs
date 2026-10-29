@@ -75,3 +75,26 @@ test('removing an absent row leaves current cart intact', () => {
   assert.deepEqual(run('cart()'),initial);
   assert.equal(run('undoCartRemoval()'),'unavailable');
 });
+
+test('failed cart writes preserve saved items and do not create Undo', () => {
+  const initial = [{id:'street',size:42,qty:2}];
+  const run = app(initial);
+  run("localStorage.setItem = () => { throw new Error('Storage full'); }; void 0");
+  run("addToCart('runner',42)");
+  assert.equal(run("removeCartItem('street',42)"),false);
+  assert.deepEqual(run('cart()'),initial);
+  assert.equal(run('undoCartRemoval()'),'unavailable');
+});
+
+test('failed Undo can be retried without losing or duplicating the removed item', () => {
+  const initial = [{id:'street',size:42,qty:2}];
+  const run = app(initial);
+  run("removeCartItem('street',42)");
+  run("const originalSetItem = localStorage.setItem; localStorage.setItem = () => { throw new Error('Storage full'); }; void 0");
+  assert.equal(run('undoCartRemoval()'),'save-failed');
+  assert.deepEqual(run('cart()'),[]);
+  run('localStorage.setItem = originalSetItem; void 0');
+  assert.equal(run('undoCartRemoval()'),'restored');
+  assert.deepEqual(run('cart()'),initial);
+  assert.equal(run('undoCartRemoval()'),'unavailable');
+});

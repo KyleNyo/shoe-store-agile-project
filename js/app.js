@@ -24,6 +24,16 @@ const write = (k, v) => localStorage.setItem(k, JSON.stringify(v));
 const user = () => read("ss_user", null);
 const MAX_QUANTITY = 99;
 
+function saveCart(items) {
+  try {
+    write("ss_cart", items);
+    return true;
+  } catch {
+    alert("Your cart could not be saved. Please allow browser storage or free up space, then try again.");
+    return false;
+  }
+}
+
 function cart() {
   const stored = read("ss_cart", []);
   if (!Array.isArray(stored)) return [];
@@ -96,7 +106,7 @@ function addToCart(id, size) {
   if (existing) existing.qty++;
   else c.push({ id, size, qty: 1 });
 
-  write("ss_cart", c);
+  if (!saveCart(c)) return;
   updateNav();
   alert("Added to cart.");
 }
@@ -327,7 +337,7 @@ function removeCartItem(id, size) {
   const removed = before.find(row => row.id === id && row.size === size);
   if (!removed) return false;
   const after = before.filter(row => row !== removed);
-  write("ss_cart", after);
+  if (!saveCart(after)) return false;
   pendingCartRemoval = {
     before, removed,
     cart: localStorage.getItem("ss_cart"),
@@ -344,7 +354,10 @@ function undoCartRemoval() {
   if (localStorage.getItem("ss_cart") !== pending.cart ||
       JSON.stringify(user()) !== pending.account ||
       localStorage.getItem("ss_last_order") !== pending.order) return "changed";
-  write("ss_cart", pending.before);
+  if (!saveCart(pending.before)) {
+    pendingCartRemoval = pending;
+    return "save-failed";
+  }
   return "restored";
 }
 
@@ -358,7 +371,8 @@ function showCartRecovery(message) {
     const result = undoCartRemoval();
     renderCart();
     updateNav();
-    showCartRecovery(result === "restored" ? "Item restored to your cart." :
+    showCartRecovery(result === "restored" ? "Item restored to your cart." : result === "save-failed" ?
+      "The item could not be restored. Your cart was not changed; you can try Undo again." :
       "Your cart or account has changed. Nothing was restored; please review your current cart.");
     notice.focus();
   };
@@ -391,9 +405,11 @@ function renderCart() {
     const item = current.find(row => row.id === selected.id && row.size === selected.size);
 
     if (item) item.qty = quantity;
+    if (!saveCart(current)) {
+      input.value = selected.qty;
+      return;
+    }
     selected.qty = quantity;
-
-    write("ss_cart", current);
     input.closest("tr").cells[4].textContent = euro(subtotalCents({ ...selected, qty: quantity }) / 100);
     el.querySelector(".cart-summary h5").textContent = `Total: ${euro(totalPrice(cartRows()))}`;
     document.getElementById("cartMessage").textContent = "Quantity updated.";
@@ -404,6 +420,7 @@ function renderCart() {
     const selected = rows[Number(button.dataset.remove)];
 
     const removed = removeCartItem(selected.id, selected.size);
+    if (!removed && cart().some(row => row.id === selected.id && row.size === selected.size)) return;
 
     const nextIndex = Number(button.dataset.remove);
     renderCart();
@@ -413,6 +430,26 @@ function renderCart() {
 
     const remaining = el.querySelectorAll("[data-remove]");
     (remaining[Math.min(nextIndex, remaining.length - 1)] || el.querySelector("a")).focus();
+  });
+}
+
+function initCartSync() {
+  window.addEventListener("storage", event => {
+    if (event.storageArea !== localStorage || ![null, "ss_cart", "ss_user", "ss_last_order"].includes(event.key)) return;
+    updateNav();
+    const area = document.getElementById("cartArea");
+    if (!area) return;
+    const active = document.activeElement;
+    const label = area.contains(active) ? active.getAttribute("aria-label") : null;
+    const hadUndo = Boolean(pendingCartRemoval);
+    pendingCartRemoval = null;
+    renderCart();
+    showCartRecovery(hadUndo ? "Your cart or account changed in another tab. Undo is no longer available; the current cart is shown below." :
+      "Updated from another tab. Your current cart is shown below.");
+    if (label) {
+      const target = [...area.querySelectorAll("[aria-label]")].find(el => el.getAttribute("aria-label") === label);
+      (target || document.getElementById("cartRecovery")).focus();
+    }
   });
 }
 
@@ -633,6 +670,7 @@ document.addEventListener("DOMContentLoaded", () => {
   renderDetail();
   initAuth();
   renderCart();
+  initCartSync();
   initCheckout();
   renderConfirmation();
 });
