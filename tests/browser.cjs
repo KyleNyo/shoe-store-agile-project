@@ -481,6 +481,8 @@ const server = http.createServer((req, res) => {
         await page.screenshot({path:path.join(root,'test-results','checkout-stale-cart.png'),fullPage:true});
         await page.locator('#checkoutGuard a').click();
         await page.locator('a[href="checkout.html"]').click();
+        await page.waitForURL('**/checkout.html');
+        await page.locator('#checkoutSummary h5').waitFor();
         assert.match(await page.locator('#checkoutSummary').innerText(),/129[.,]98/);
         await page.fill('#address','Test Street 1');await page.fill('#city','Test City');
         await page.fill('#postal','12345');await page.fill('#cardNumber','1111222233334444');
