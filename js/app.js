@@ -24,6 +24,16 @@ const write = (k, v) => localStorage.setItem(k, JSON.stringify(v));
 const user = () => read("ss_user", null);
 const MAX_QUANTITY = 99;
 
+function saveCart(items, onError = alert) {
+  try {
+    write("ss_cart", items);
+    return true;
+  } catch {
+    onError("Your cart could not be saved. Please allow browser storage or free up space, then try again.");
+    return false;
+  }
+}
+
 function cart() {
   const stored = read("ss_cart", []);
   if (!Array.isArray(stored)) return [];
@@ -85,20 +95,29 @@ function addToCart(id, size) {
 
   if (!product || !product.sizes.includes(size)) return;
 
+  const feedback = (message, success = false) => {
+    const status = document.getElementById?.("addCartStatus");
+    if (!status) { alert(message); return; }
+    status.textContent = message;
+    status.className = success ? "text-success mt-3" : "text-danger mt-3";
+    document.getElementById("viewCartLink").hidden = !success;
+  };
+
   const c = cart();
   const existing = c.find(item => item.id === id && item.size === size);
 
   if (existing && existing.qty >= MAX_QUANTITY) {
-    alert(`You can add up to ${MAX_QUANTITY} pairs of each size.`);
+    feedback(`You can add up to ${MAX_QUANTITY} pairs of each size. Your cart has not changed.`);
     return;
   }
 
   if (existing) existing.qty++;
   else c.push({ id, size, qty: 1 });
 
-  write("ss_cart", c);
+  if (!saveCart(c, feedback)) return;
   updateNav();
-  alert("Added to cart.");
+  const quantity = c.find(item => item.id === id && item.size === size).qty;
+  feedback(`${product.name}, size ${size}, added to cart. ${quantity} ${quantity === 1 ? "pair" : "pairs"} of this size in your cart.`, true);
 }
 
 function initHomeSearch() {
@@ -150,7 +169,24 @@ function renderCatalog() {
     search.value = searchQuery;
   }
 
+  const params = new URLSearchParams(location.search);
+  for (const [key, control] of [["sort", sort], ["size", sizeFilter]]) {
+    const value = params.get(key);
+    if (value !== null && [...control.options].some(option => option.value === value)) control.value = value;
+  }
+  minPrice.value = params.get("min") || "";
+  maxPrice.value = params.get("max") || "";
+
   const run = () => {
+    const url = new URL(location.href);
+    const controls = [["search", search.value], ["category", filter.value === "All" ? "" : filter.value],
+      ["sort", sort.value === "default" ? "" : sort.value], ["min", minPrice.value],
+      ["max", maxPrice.value], ["size", sizeFilter.value]];
+    for (const [key, value] of controls) {
+      if (value) url.searchParams.set(key, value);
+      else url.searchParams.delete(key);
+    }
+    history.replaceState(history.state, "", url);
     const term = search.value.trim().toLowerCase();
     const cat = filter.value;
     const minimum = minPrice.value === "" ? null : Math.round(Number(minPrice.value) * 100);
@@ -183,6 +219,13 @@ function renderCatalog() {
     }
 
     grid.innerHTML = list.map(card).join("");
+    grid.querySelectorAll('a[href^="product-detail.html"]').forEach(link => {
+      const detail = new URL(link.href);
+      const state = new URLSearchParams();
+      for (const [key, value] of controls) if (value) state.set(key, value);
+      if (state.size) detail.searchParams.set("catalog", state.toString());
+      link.setAttribute("href", "product-detail.html" + detail.search);
+    });
 
     message.innerHTML = list.length
       ? ""
@@ -221,6 +264,19 @@ function renderDetail() {
 
   const p = PRODUCTS.find(x => x.id === new URLSearchParams(location.search).get("id"));
 
+  // Only carry known catalogue controls; never accept a destination URL.
+  const state = new URLSearchParams(new URLSearchParams(location.search).get("catalog") || "");
+  const safeState = new URLSearchParams();
+  for (const key of ["search", "category", "sort", "min", "max", "size"]) {
+    if (state.has(key)) safeState.set(key, state.get(key));
+  }
+  const back = document.createElement("a");
+  back.id = "returnToCatalog";
+  back.className = "btn btn-outline-primary mb-3";
+  back.textContent = "Back to catalogue";
+  back.href = "catalog.html" + (safeState.size ? "?" + safeState.toString() : "");
+  el.before(back);
+
   if (!p) {
     el.innerHTML = '<div class="alert alert-warning">Product not found.</div>';
     return;
@@ -228,6 +284,21 @@ function renderDetail() {
 
   el.innerHTML = `<div class="row g-4"><div class="col-md-6">${productImage(p, true)}</div><div class="col-md-6"><span class="badge badge-orange">${p.category}</span><h2 class="mt-2">${p.name}</h2><p>${p.description}</p><p class="price">${euro(p.price)}</p><label class="form-label" for="shoeSize">Size</label><select id="shoeSize" class="form-select mb-3">${p.sizes.map(s => `<option>${s}</option>`).join("")}</select><button id="addBtn" class="btn btn-primary">Add to Cart</button></div></div>`;
 
+  const selectedSize = safeState.get("size");
+  const status = document.createElement("p");
+  status.id = "addCartStatus";
+  status.setAttribute("role", "status");
+  status.setAttribute("aria-atomic", "true");
+  const viewCart = document.createElement("a");
+  viewCart.id = "viewCartLink";
+  viewCart.href = "cart.html";
+  viewCart.className = "btn btn-outline-primary";
+  viewCart.textContent = "View cart";
+  viewCart.hidden = true;
+  document.getElementById("addBtn").after(status, viewCart);
+  if (selectedSize !== null && p.sizes.includes(Number(selectedSize))) {
+    document.getElementById("shoeSize").value = String(Number(selectedSize));
+  }
   document.getElementById("addBtn").onclick = () => addToCart(p.id, document.getElementById("shoeSize").value);
 }
 
@@ -327,7 +398,7 @@ function removeCartItem(id, size) {
   const removed = before.find(row => row.id === id && row.size === size);
   if (!removed) return false;
   const after = before.filter(row => row !== removed);
-  write("ss_cart", after);
+  if (!saveCart(after)) return false;
   pendingCartRemoval = {
     before, removed,
     cart: localStorage.getItem("ss_cart"),
@@ -344,7 +415,10 @@ function undoCartRemoval() {
   if (localStorage.getItem("ss_cart") !== pending.cart ||
       JSON.stringify(user()) !== pending.account ||
       localStorage.getItem("ss_last_order") !== pending.order) return "changed";
-  write("ss_cart", pending.before);
+  if (!saveCart(pending.before)) {
+    pendingCartRemoval = pending;
+    return "save-failed";
+  }
   return "restored";
 }
 
@@ -358,7 +432,8 @@ function showCartRecovery(message) {
     const result = undoCartRemoval();
     renderCart();
     updateNav();
-    showCartRecovery(result === "restored" ? "Item restored to your cart." :
+    showCartRecovery(result === "restored" ? "Item restored to your cart." : result === "save-failed" ?
+      "The item could not be restored. Your cart was not changed; you can try Undo again." :
       "Your cart or account has changed. Nothing was restored; please review your current cart.");
     notice.focus();
   };
@@ -391,9 +466,11 @@ function renderCart() {
     const item = current.find(row => row.id === selected.id && row.size === selected.size);
 
     if (item) item.qty = quantity;
+    if (!saveCart(current)) {
+      input.value = selected.qty;
+      return;
+    }
     selected.qty = quantity;
-
-    write("ss_cart", current);
     input.closest("tr").cells[4].textContent = euro(subtotalCents({ ...selected, qty: quantity }) / 100);
     el.querySelector(".cart-summary h5").textContent = `Total: ${euro(totalPrice(cartRows()))}`;
     document.getElementById("cartMessage").textContent = "Quantity updated.";
@@ -404,6 +481,7 @@ function renderCart() {
     const selected = rows[Number(button.dataset.remove)];
 
     const removed = removeCartItem(selected.id, selected.size);
+    if (!removed && cart().some(row => row.id === selected.id && row.size === selected.size)) return;
 
     const nextIndex = Number(button.dataset.remove);
     renderCart();
@@ -413,6 +491,38 @@ function renderCart() {
 
     const remaining = el.querySelectorAll("[data-remove]");
     (remaining[Math.min(nextIndex, remaining.length - 1)] || el.querySelector("a")).focus();
+  });
+}
+
+function initCartSync() {
+  const refresh = (restored = false) => {
+    updateNav();
+    const area = document.getElementById("cartArea");
+    if (!area) return;
+    const active = document.activeElement;
+    const label = area.contains(active) ? active.getAttribute("aria-label") : null;
+    const hadUndo = Boolean(pendingCartRemoval);
+    pendingCartRemoval = null;
+    renderCart();
+    const message = restored
+      ? "Cart refreshed after returning to this page. Review your current items below." + (hadUndo ? " Undo is no longer available." : "")
+      : hadUndo ? "Your cart or account changed in another tab. Undo is no longer available; the current cart is shown below."
+        : "Updated from another tab. Your current cart is shown below.";
+    showCartRecovery(message);
+    if (label) {
+      const target = [...area.querySelectorAll("[aria-label]")].find(el => el.getAttribute("aria-label") === label);
+      (target || document.getElementById("cartRecovery")).focus();
+    } else if (active?.id === "undoCartRemoval") {
+      document.getElementById("cartRecovery").focus();
+    }
+  };
+  window.addEventListener("storage", event => {
+    if (event.storageArea !== localStorage || ![null, "ss_cart", "ss_user", "ss_last_order"].includes(event.key)) return;
+    refresh();
+  });
+  // Cached pages may have missed storage events while they were suspended.
+  window.addEventListener("pageshow", event => {
+    if (event.persisted) refresh(true);
   });
 }
 
@@ -527,22 +637,34 @@ function initCheckout() {
     updateNav();
   };
 
+  const reviewedCheckoutIsCurrent = () => {
+    const currentUser = user();
+    if (!currentUser || currentUser.email !== u.email) {
+      blockCheckout('Your account has changed. <a href="login.html">Check your account</a>, then return to checkout. No order was placed.');
+      return false;
+    }
+    if (JSON.stringify(cart()) !== cartSnapshot) {
+      blockCheckout('Your cart has changed. <a href="cart.html">Review your cart</a> before checking out again. No order was placed.');
+      return false;
+    }
+    return !checkoutBlocked;
+  };
+
+  window.addEventListener("storage", event => {
+    if (event.storageArea === localStorage && [null, "ss_cart", "ss_user"].includes(event.key)) {
+      reviewedCheckoutIsCurrent();
+    }
+  });
+  window.addEventListener("pageshow", event => {
+    if (event.persisted) reviewedCheckoutIsCurrent();
+  });
+
   form.onsubmit = e => {
     e.preventDefault();
     submitted = true;
 
-    if (checkoutBlocked) return;
-
-    // Another tab may have changed the account or cart since this page loaded.
-    const currentUser = user();
-    if (!currentUser || currentUser.email !== u.email) {
-      blockCheckout('Your account has changed. <a href="login.html">Check your account</a>, then return to checkout. No order was placed.');
-      return;
-    }
-    if (JSON.stringify(cart()) !== cartSnapshot) {
-      blockCheckout('Your cart has changed. <a href="cart.html">Review your cart</a> before checking out again. No order was placed.');
-      return;
-    }
+    // Also check at submission, even if a storage event has not arrived yet.
+    if (!reviewedCheckoutIsCurrent()) return;
 
     if (!validate()) {
       errorSummary.focus();
@@ -557,8 +679,32 @@ function initCheckout() {
       qty: row.qty,
       unitPriceCents: Math.round(row.p.price * 100)
     }));
-    write("ss_last_order", { order, total, items });
-    write("ss_cart", []);
+    let previousOrder;
+    let orderSaved = false;
+    try {
+      previousOrder = localStorage.getItem("ss_last_order");
+      write("ss_last_order", { order, total, items });
+      orderSaved = true;
+      write("ss_cart", []);
+    } catch {
+      let recovered = !orderSaved;
+      if (orderSaved) {
+        try {
+          if (previousOrder === null) localStorage.removeItem("ss_last_order");
+          else localStorage.setItem("ss_last_order", previousOrder);
+          recovered = true;
+        } catch { /* Storage can become unavailable during recovery as well. */ }
+      }
+      if (!recovered) {
+        blockCheckout('Checkout could not finish saving, and the previous order record could not be restored. <a href="cart.html">Review your cart</a> before trying again.');
+      } else {
+        guard.textContent = "Your order could not be saved. Your cart and previous order were kept. Please allow browser storage or free up space, then try again.";
+        guard.setAttribute("role", "alert");
+        guard.setAttribute("tabindex", "-1");
+        guard.focus();
+      }
+      return;
+    }
     checkoutBlocked = true;
 
     location.href = "confirmation.html";
@@ -595,7 +741,8 @@ function renderConfirmation() {
   );
   const sum = validItems ? o.items.reduce((total, item) => total + item.unitPriceCents * item.qty, 0) : null;
 
-  if (validItems && sum === Math.round(o.total * 100)) {
+  const hasItemDetails = validItems && sum === Math.round(o.total * 100);
+  if (hasItemDetails) {
     const table = document.createElement("table");
     table.className = "table order-items text-start";
     const caption = table.createCaption();
@@ -622,6 +769,31 @@ function renderConfirmation() {
 
   printButton.hidden = false;
   printButton.addEventListener("click", () => window.print());
+
+  // Export the displayed snapshot, even if another tab replaces the latest order.
+  const summary = ["SoleStyle — Simulated order summary", `Order: ${o.order}`, "",
+    ...(hasItemDetails ? o.items.map(item =>
+      `${item.name} | EU size ${item.size} | Quantity ${item.qty} | Unit price ${euro(item.unitPriceCents / 100)} | Subtotal ${euro(item.unitPriceCents * item.qty / 100)}`)
+      : ["Item details are unavailable for this saved order."]),
+    "", `Total: ${euro(o.total)}`, "",
+    "Student project: simulated purchase. This is not a payment receipt."
+  ].join("\r\n");
+  const downloadButton = document.createElement("button");
+  downloadButton.id = "downloadOrder";
+  downloadButton.type = "button";
+  downloadButton.className = "btn btn-outline-primary";
+  downloadButton.textContent = "Download order summary";
+  downloadButton.onclick = () => {
+    const url = URL.createObjectURL(new Blob([summary], { type: "text/plain;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "SoleStyle-order-summary.txt";
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  printButton.after(downloadButton);
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -633,6 +805,7 @@ document.addEventListener("DOMContentLoaded", () => {
   renderDetail();
   initAuth();
   renderCart();
+  initCartSync();
   initCheckout();
   renderConfirmation();
 });

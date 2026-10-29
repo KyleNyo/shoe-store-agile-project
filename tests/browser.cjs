@@ -30,6 +30,44 @@ const server = http.createServer((req, res) => {
   const check = async(name, fn) => {await fn(); results.push(name); console.log('PASS ' + name);};
   const goto = file => page.goto(base + '/' + file);
   try {
+    await check('Product adds show saved size and quantity inline without interrupting keyboard use', async () => {
+      await goto('product-detail.html?id=street');
+      await page.evaluate(()=>localStorage.clear());
+      await page.reload();
+      assert.equal(await page.locator('#viewCartLink').isVisible(),false);
+      await page.locator('#shoeSize').selectOption('42');
+      await page.locator('#addBtn').focus();
+      await page.keyboard.press('Enter');
+      assert.match(await page.locator('#addCartStatus').innerText(),/Street Classic, size 42.*1 pair/);
+      assert.equal(await page.locator('#addCartStatus').getAttribute('role'),'status');
+      assert.equal(await page.locator('#addBtn').evaluate(el=>el===document.activeElement),true);
+      await page.keyboard.press('Enter');
+      assert.match(await page.locator('#addCartStatus').innerText(),/2 pairs/);
+      assert.equal(await page.locator('[data-cart-count]').first().innerText(),'2');
+      await page.keyboard.press('Tab');
+      assert.equal(await page.locator('#viewCartLink').evaluate(el=>el===document.activeElement),true);
+      await page.keyboard.press('Enter');
+      await page.waitForURL(/cart\.html$/);
+      assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('ss_cart'))),[{id:'street',size:42,qty:2}]);
+    });
+    await check('Product add cap and storage failure replace stale success without changing saved cart', async () => {
+      await goto('product-detail.html?id=street');
+      await page.evaluate(()=>localStorage.setItem('ss_cart',JSON.stringify([{id:'street',size:39,qty:98}])));
+      await page.reload();
+      await page.locator('#addBtn').click();
+      assert.match(await page.locator('#addCartStatus').innerText(),/99 pairs/);
+      await page.locator('#addBtn').click();
+      assert.match(await page.locator('#addCartStatus').innerText(),/cart has not changed/);
+      assert.equal(await page.locator('#viewCartLink').isVisible(),false);
+      await page.locator('#shoeSize').selectOption('42');
+      await page.evaluate(()=>{Storage.prototype.setItem=function(){throw new Error('Storage full');};});
+      await page.locator('#addBtn').click();
+      assert.match(await page.locator('#addCartStatus').innerText(),/could not be saved/);
+      assert.equal(await page.locator('#viewCartLink').isVisible(),false);
+      assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('ss_cart'))),[{id:'street',size:39,qty:99}]);
+      await page.reload();
+      await page.evaluate(()=>localStorage.clear());
+    });
     await check('Keyboard skip links, visible focus, labelled controls and mobile menu', async () => {
       for (const file of ['index.html','catalog.html','product-detail.html?id=street','cart.html','login.html','checkout.html']) {
         await goto(file);
@@ -411,6 +449,43 @@ const server = http.createServer((req, res) => {
       await page.screenshot({path:path.join(evidence,'order-print-preview.png'),fullPage:true});
       await page.emulateMedia({media:'screen'});
     });
+    await check('Keyboard download exports displayed order sizes and totals without changing storage', async () => {
+      const order={order:'SS-export-test',total:194.97,items:[
+        {name:'Street Classic',size:42,qty:2,unitPriceCents:6499},
+        {name:'Street Classic',size:43,qty:1,unitPriceCents:6499}
+      ]};
+      await page.evaluate(order=>localStorage.setItem('ss_last_order',JSON.stringify(order)),order);
+      await goto('confirmation.html');
+      // The screen and export must agree if the latest saved order later changes.
+      await page.evaluate(()=>localStorage.setItem('ss_last_order',JSON.stringify({order:'newer-order',total:1})));
+      const before=await page.evaluate(()=>({order:localStorage.getItem('ss_last_order'),cart:localStorage.getItem('ss_cart')}));
+      await page.locator('#downloadOrder').focus();
+      const [download]=await Promise.all([page.waitForEvent('download'),page.keyboard.press('Enter')]);
+      assert.equal(download.suggestedFilename(),'SoleStyle-order-summary.txt');
+      const text=fs.readFileSync(await download.path(),'utf8');
+      assert.match(text,/Order: SS-export-test/);
+      assert.match(text,/EU size 42 \| Quantity 2 \| Unit price €64.99 \| Subtotal €129.98/);
+      assert.match(text,/EU size 43 \| Quantity 1/);
+      assert.match(text,/Total: €194.97/);
+      assert.match(text,/not a payment receipt/);
+      assert.doesNotMatch(text,/newer-order|cardNumber|address|email/i);
+      assert.deepEqual(await page.evaluate(()=>({order:localStorage.getItem('ss_last_order'),cart:localStorage.getItem('ss_cart')})),before);
+      assert.equal(await page.locator('#downloadOrder').evaluate(el=>el===document.activeElement),true);
+      await download.saveAs(path.join(evidence,'SoleStyle-order-summary.txt'));
+    });
+    await check('Order downloads disclose unavailable legacy or inconsistent items and hide for absent orders', async () => {
+      for(const order of [{order:'legacy',total:5},{order:'mismatch',total:5,items:[{name:'Unverified item',size:42,qty:1,unitPriceCents:100}]}]) {
+        await page.evaluate(order=>localStorage.setItem('ss_last_order',JSON.stringify(order)),order);
+        await goto('confirmation.html');
+        const [download]=await Promise.all([page.waitForEvent('download'),page.locator('#downloadOrder').click()]);
+        const text=fs.readFileSync(await download.path(),'utf8');
+        assert.match(text,/Item details are unavailable/);
+        assert.match(text,/Total: €5.00/);
+        assert.doesNotMatch(text,/Unverified item/);
+      }
+      await page.evaluate(()=>localStorage.removeItem('ss_last_order'));await page.reload();
+      assert.equal(await page.locator('#downloadOrder').count(),0);
+    });
     await check('Legacy, absent and malformed orders never invent item details or execute saved markup', async () => {
       await page.evaluate(()=>localStorage.setItem('ss_last_order',JSON.stringify({order:'SS12345678',total:194.97})));
       await goto('confirmation.html');
@@ -456,7 +531,7 @@ const server = http.createServer((req, res) => {
       await page.locator('[data-remove="0"]').click();assert.match(await page.locator('#cartArea').innerText(),/Your cart is empty/);
     });
     fs.mkdirSync(path.join(root,'test-results'),{recursive:true});
-    await check('Two-tab checkout rejects changed carts and permits reviewed retry', async () => {
+    await check('Two-tab checkout immediately hides stale totals and permits reviewed retry', async () => {
       await goto('cart.html');
       await page.evaluate(() => {
         localStorage.setItem('ss_user', JSON.stringify({name:'Checkout Test',email:'checkout@example.test'}));
@@ -470,7 +545,8 @@ const server = http.createServer((req, res) => {
       try {
         await other.goto(base+'/cart.html');
         await other.locator('[data-qty="0"]').fill('2');await other.locator('[data-qty="0"]').press('Tab');
-        await page.locator('#checkoutForm button').click();
+        await page.getByText('Your cart has changed.',{exact:false}).waitFor();
+        assert.equal(await page.locator('#checkoutContent').isVisible(),false);
         assert.match(page.url(),/checkout.html$/);
         assert.match(await page.locator('#checkoutGuard').innerText(),/cart has changed/);
         assert.equal(await page.locator('#checkoutGuard').evaluate(el => el === document.activeElement),true);
@@ -499,7 +575,8 @@ const server = http.createServer((req, res) => {
       const other = await context.newPage();
       try {
         await other.goto(base+'/login.html');await other.click('#logoutBtn');
-        await page.locator('#checkoutForm button').click();
+        await page.getByText('Your account has changed.',{exact:false}).waitFor();
+        assert.equal(await page.locator('#checkoutContent').isVisible(),false);
         assert.match(page.url(),/checkout.html$/);
         assert.match(await page.locator('#checkoutGuard').innerText(),/account has changed/);
         assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('ss_cart'))[0].qty),1);
@@ -538,17 +615,48 @@ const server = http.createServer((req, res) => {
     });
     await check('Two-tab cart change cancels stale Undo without losing new items', async () => {
       await page.locator('[data-remove="0"]').click();
+      await page.locator('#undoCartRemoval').focus();
       const other = await context.newPage();
       other.on('dialog', dialog => dialog.accept());
       try {
         await other.goto(base+'/product-detail.html?id=trail');
         await other.selectOption('#shoeSize','46');await other.click('#addBtn');
-        await page.locator('#undoCartRemoval').click();
-        assert.match(await page.locator('#cartRecoveryMessage').innerText(),/Nothing was restored/);
+        await page.getByText('Your cart or account changed in another tab. Undo is no longer available; the current cart is shown below.',{exact:true}).waitFor();
+        assert.equal(await page.locator('#undoCartRemoval').isVisible(),false);
+        assert.equal(await page.locator('#cartRecovery').evaluate(el=>el===document.activeElement),true);
         assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem('ss_cart'))),[{id:'trail',size:46,qty:1}]);
         assert.equal(await page.locator('tbody tr').count(),1);
         assert.match(await page.locator('tbody tr').innerText(),/Trail Motion/);
       } finally { await other.close(); }
+    });
+    await check('Cached cart restoration refreshes saved rows and navigation and invalidates stale Undo', async () => {
+      await goto('cart.html');
+      await page.evaluate(()=>{
+        localStorage.setItem('ss_user',JSON.stringify({name:'Restore Test',email:'restore@example.test'}));
+        localStorage.setItem('ss_cart',JSON.stringify([{id:'street',size:42,qty:1},{id:'runner',size:43,qty:1}]));
+      });
+      await page.reload();
+      await page.locator('[data-remove="0"]').click();
+      await page.locator('#undoCartRemoval').focus();
+      const saved=await page.evaluate(()=>{
+        // Simulate writes missed while a document was in the back/forward cache.
+        localStorage.setItem('ss_cart',JSON.stringify([{id:'trail',size:46,qty:2}]));
+        localStorage.removeItem('ss_user');
+        window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:false}));
+        return {cart:localStorage.getItem('ss_cart'),order:localStorage.getItem('ss_last_order')};
+      });
+      assert.match(await page.locator('#cartArea').innerText(),/Velocity Runner/);
+      await page.evaluate(()=>window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true})));
+      assert.match(await page.locator('#cartArea').innerText(),/Trail Motion/);
+      assert.doesNotMatch(await page.locator('#cartArea').innerText(),/Velocity Runner/);
+      assert.equal(await page.locator('[data-qty="0"]').inputValue(),'2');
+      assert.equal(await page.locator('[data-cart-count]').innerText(),'2');
+      assert.equal(await page.locator('[data-auth-link]').innerText(),'Login');
+      assert.equal(await page.locator('#undoCartRemoval').isVisible(),false);
+      assert.match(await page.locator('#cartRecoveryMessage').innerText(),/refreshed after returning/);
+      assert.equal(await page.locator('#cartRecovery').evaluate(el=>el===document.activeElement),true);
+      assert.deepEqual(await page.evaluate(()=>({cart:localStorage.getItem('ss_cart'),order:localStorage.getItem('ss_last_order')})),saved);
+      await page.evaluate(()=>localStorage.setItem('ss_user',JSON.stringify({name:'Checkout Test',email:'checkout@example.test'})));
     });
     await check('Checkout distinguishes sizes and provides a working Edit cart link', async () => {
       await page.evaluate(() => {
@@ -566,6 +674,116 @@ const server = http.createServer((req, res) => {
       await page.getByRole('link',{name:'Edit cart',exact:true}).click();
       await page.waitForURL('**/cart.html');
       assert.equal(await page.locator('tbody tr').count(),2);
+    });
+    await check('Other-tab quantity and removal update the current cart and keep useful focus', async () => {
+      const other = await context.newPage();
+      try {
+        await other.goto(base+'/cart.html');
+        await page.locator('[data-qty="0"]').focus();
+        await other.locator('[data-qty="0"]').fill('3');await other.locator('[data-qty="0"]').press('Tab');
+        await page.waitForFunction(() => document.querySelector('[data-qty="0"]').value === '3');
+        assert.match(await page.locator('.cart-summary').innerText(),/259[.,]96/);
+        assert.equal(await page.locator('[data-cart-count]').innerText(),'4');
+        assert.equal(await page.locator('[data-qty="0"]').evaluate(el=>el===document.activeElement),true);
+        await other.locator('[data-remove="0"]').click();
+        await page.waitForFunction(() => document.querySelectorAll('tbody tr').length === 1);
+        assert.equal(await page.locator('[data-cart-count]').innerText(),'1');
+        assert.match(await page.locator('.cart-summary').innerText(),/64[.,]99/);
+      } finally { await other.close(); }
+    });
+    await check('Storage failure preserves quantity, totals and removal; retry succeeds', async () => {
+      const dialogs=[]; const record=dialog=>dialogs.push(dialog.message());page.on('dialog',record);
+      await page.evaluate(() => {
+        window.restoreStorage = Storage.prototype.setItem;
+        Storage.prototype.setItem = function(key,value) {
+          if(key==='ss_cart') throw new DOMException('Full','QuotaExceededError');
+          return window.restoreStorage.call(this,key,value);
+        };
+      });
+      try {
+        await page.locator('[data-qty="0"]').fill('4');await page.locator('[data-qty="0"]').press('Tab');
+        assert.equal(await page.locator('[data-qty="0"]').inputValue(),'1');
+        assert.match(await page.locator('.cart-summary').innerText(),/64[.,]99/);
+        await page.locator('[data-remove="0"]').click();
+        assert.equal(await page.locator('tbody tr').count(),1);
+        assert.equal(await page.locator('#undoCartRemoval').isVisible(),false);
+        assert.equal(dialogs.length,2); assert.ok(dialogs.every(message=>/could not be saved/.test(message)));
+      } finally {
+        await page.evaluate(()=>{Storage.prototype.setItem=window.restoreStorage;delete window.restoreStorage;});
+        page.off('dialog',record);
+      }
+      await page.locator('[data-remove="0"]').click();
+      assert.match(await page.locator('#cartArea').innerText(),/Your cart is empty/);
+      await page.locator('#undoCartRemoval').click();
+      assert.equal(await page.locator('tbody tr').count(),1);
+    });
+    await check('Failed checkout saves preserve cart/order and allow a successful retry', async () => {
+      for (const failedKey of ['ss_last_order','ss_cart']) {
+        await page.evaluate(()=>localStorage.setItem('ss_cart',JSON.stringify([{id:'street',size:42,qty:1}])));
+        await goto('checkout.html');
+        await page.fill('#address','Test Street 1');await page.fill('#city','Test City');
+        await page.fill('#postal','12345');await page.fill('#cardNumber','1111222233334444');
+        const previous=await page.evaluate(()=>localStorage.getItem('ss_last_order'));
+        await page.evaluate(key=>{
+          const original=Storage.prototype.setItem;let failOnce=true;
+          Storage.prototype.setItem=function(k,v){
+            if(k===key&&failOnce){failOnce=false;throw new DOMException('Full','QuotaExceededError');}
+            return original.call(this,k,v);
+          };
+          window.restoreStorage=()=>{Storage.prototype.setItem=original;};
+        },failedKey);
+        await page.locator('#checkoutForm button').click();
+        assert.match(page.url(),/checkout.html$/);
+        assert.match(await page.locator('#checkoutGuard').innerText(),/could not be saved/);
+        assert.equal(await page.evaluate(()=>localStorage.getItem('ss_last_order')),previous);
+        assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('ss_cart'))[0].qty),1);
+        assert.equal(await page.locator('#address').inputValue(),'Test Street 1');
+        await page.evaluate(()=>{window.restoreStorage();delete window.restoreStorage;});
+        await page.locator('#checkoutForm button').click();await page.waitForURL('**/confirmation.html');
+        assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('ss_last_order')).total),64.99);
+        assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('ss_cart'))),[]);
+      }
+    });
+    await check('Product return and reload preserve all catalogue controls and matching order', async () => {
+      await goto('catalog.html?campaign=demo#products');
+      await page.selectOption('#categoryFilter','Sneakers');
+      await page.selectOption('#priceSort','price-desc');
+      await page.selectOption('#sizeFilter','42');
+      await page.fill('#minPrice','60');await page.fill('#maxPrice','80');
+      await page.fill('#productSearch','sneaker');
+      const names=await page.locator('.product-card h5').allTextContents();
+      assert.equal(names.length,2);
+      const catalogURL=page.url();
+      assert.equal(new URL(catalogURL).searchParams.get('campaign'),'demo');
+      await page.locator('#productGrid a').first().click();
+      await page.waitForURL('**/product-detail.html?*');
+      assert.equal(await page.locator('#shoeSize').inputValue(),'42');
+      await page.locator('#returnToCatalog').click();
+      await page.waitForURL('**/catalog.html?*');
+      await page.locator('#productGrid .product-card').first().waitFor();
+      for(const [id,value] of [['categoryFilter','Sneakers'],['priceSort','price-desc'],['sizeFilter','42'],['minPrice','60'],['maxPrice','80'],['productSearch','sneaker']]) {
+        assert.equal(await page.locator('#'+id).inputValue(),value);
+      }
+      assert.deepEqual(await page.locator('.product-card h5').allTextContents(),names);
+      await page.reload();
+      assert.deepEqual(await page.locator('.product-card h5').allTextContents(),names);
+      await page.locator('#resetFilters').click();await page.reload();
+      assert.equal(await page.locator('.product-card').count(),6);
+      for(const key of ['search','category','sort','size','min','max']) assert.equal(new URL(page.url()).searchParams.has(key),false);
+    });
+    await check('Direct or malformed product return state cannot navigate outside the catalogue', async () => {
+      for(const suffix of ['', '?id=missing&catalog='+encodeURIComponent('destination=https://example.com&sort=invalid&size=999'), '?id=street&catalog='+encodeURIComponent('search=<img src=x onerror=alert(1)>&category=Invalid&sort=invalid&size=999')]) {
+        await goto('product-detail.html'+suffix);
+        const target=new URL(await page.locator('#returnToCatalog').getAttribute('href'),page.url());
+        assert.equal(target.origin,new URL(base).origin);
+        assert.equal(target.pathname,'/catalog.html');
+        assert.equal(target.searchParams.has('destination'),false);
+        await page.locator('#returnToCatalog').click();
+        await page.waitForURL('**/catalog.html*');
+        assert.equal(await page.locator('#priceSort').inputValue(),'default');
+        assert.equal(await page.locator('#sizeFilter').inputValue(),'');
+        assert.equal(await page.locator('#categoryFilter').inputValue(),'All');
+      }
     });
     for(const width of [375,768,1440]) await check(`Layout and navigation at ${width}px`, async () => {
       await page.setViewportSize({width,height:900});

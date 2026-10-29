@@ -18,17 +18,108 @@ function checkout() {
       after() {}, addEventListener() {}, replaceChildren() {}, focus() {}
     }]));
   const location = { href: 'checkout.html' };
+  const listeners = {};
   const context = vm.createContext({ Intl, URLSearchParams, location, alert() {},
-    localStorage: { getItem: key => data.get(key) ?? null, setItem: (key, value) => data.set(key, value) },
+    window: { addEventListener: (name, handler) => { listeners[name] = handler; } },
+    localStorage: { getItem: key => data.get(key) ?? null, setItem: (key, value) => data.set(key, value), removeItem: key => data.delete(key) },
     document: { addEventListener() {}, createElement: () => ({}), getElementById: id => elements[id], querySelectorAll: () => [], querySelector: () => null }
   });
   vm.runInContext(fs.readFileSync('js/app.js', 'utf8'), context);
   vm.runInContext('initCheckout()', context);
   return { data, elements, location, savedOrder,
+    storage: key => listeners.storage({key, storageArea:context.localStorage}),
+    restore: () => listeners.pageshow({persisted:true}),
+    run: expression => vm.runInContext(expression, context),
     set: (key, value) => data.set(key, JSON.stringify(value)),
     get: key => JSON.parse(data.get(key)),
     submit: () => elements.checkoutForm.onsubmit({ preventDefault() {} }) };
 }
+
+test('another-tab cart update blocks checkout before submission without writing an order', () => {
+  const app = checkout();
+  app.set('ss_cart', [{id:'street',size:43,qty:1}]);
+  app.storage('ss_cart');
+  assert.equal(app.elements.checkoutContent.style.display,'none');
+  assert.match(app.elements.checkoutGuard.innerHTML,/cart has changed/);
+  assert.deepEqual(app.get('ss_last_order'),app.savedOrder);
+  assert.equal(app.location.href,'checkout.html');
+});
+
+test('another-tab storage clear invalidates checkout immediately', () => {
+  const app = checkout();
+  app.data.clear();
+  app.storage(null);
+  assert.equal(app.elements.checkoutContent.style.display,'none');
+  assert.match(app.elements.checkoutGuard.innerHTML,/account has changed/);
+  assert.equal(app.data.size,0);
+});
+
+test('unchanged and unrelated storage events keep entered checkout usable', () => {
+  const app = checkout();
+  app.storage('ss_cart');
+  app.set('ss_last_order',{order:'another',total:20});
+  app.storage('ss_last_order');
+  assert.notEqual(app.elements.checkoutContent.style.display,'none');
+  app.submit();
+  assert.equal(app.location.href,'confirmation.html');
+});
+
+test('restored checkout rechecks the cart before displaying an obsolete total', () => {
+  const app = checkout();
+  app.set('ss_cart',[]);
+  app.restore();
+  assert.equal(app.elements.checkoutContent.style.display,'none');
+  assert.match(app.elements.checkoutGuard.innerHTML,/cart has changed/);
+  assert.deepEqual(app.get('ss_last_order'),app.savedOrder);
+});
+
+test('restoring a completed checkout hides the finished form and cannot create another order', () => {
+  const app = checkout();
+  app.submit();
+  const order = app.get('ss_last_order');
+  app.restore();
+  assert.equal(app.elements.checkoutContent.style.display,'none');
+  assert.match(app.elements.checkoutGuard.innerHTML,/cart has changed/);
+  app.submit();
+  assert.deepEqual(app.get('ss_last_order'),order);
+  assert.deepEqual(app.get('ss_cart'),[]);
+});
+
+for (const key of ['ss_last_order','ss_cart']) {
+  test(`checkout preserves the cart and previous order if saving ${key} fails`, () => {
+    const app = checkout();
+    app.run(`const originalWrite = localStorage.setItem; let failOnce = true;
+      localStorage.setItem = (key,value) => {
+        if (key === '${key}' && failOnce) { failOnce = false; throw new Error('Full'); }
+        originalWrite(key,value);
+      };`);
+    app.submit();
+    assert.equal(app.location.href,'checkout.html');
+    assert.equal(app.get('ss_cart')[0].qty,1);
+    assert.deepEqual(app.get('ss_last_order'),app.savedOrder);
+    assert.match(app.elements.checkoutGuard.textContent,/could not be saved/);
+    app.submit();
+    assert.equal(app.location.href,'confirmation.html');
+    assert.deepEqual(app.get('ss_cart'),[]);
+  });
+}
+
+test('failed checkout rollback blocks retry and reports the incomplete state', () => {
+  const app=checkout();
+  app.run(`const originalWrite = localStorage.setItem; let wroteOrder = false;
+    localStorage.setItem = (key,value) => {
+      if (wroteOrder) throw new Error('Unavailable');
+      originalWrite(key,value); wroteOrder = true;
+    };`);
+  app.submit();
+  assert.equal(app.location.href,'checkout.html');
+  assert.equal(app.get('ss_cart')[0].qty,1);
+  assert.match(app.elements.checkoutGuard.innerHTML,/previous order record could not be restored/);
+  const saved=app.get('ss_last_order');
+  app.submit();
+  assert.deepEqual(app.get('ss_last_order'),saved);
+  assert.equal(app.location.href,'checkout.html');
+});
 
 for (const [name, changedCart] of [
   ['quantity changed', [{ id: 'street', size: 42, qty: 2 }]],
