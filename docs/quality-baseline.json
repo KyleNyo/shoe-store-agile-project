@@ -1,0 +1,30 @@
+{
+  "baseline": "45fe068 application, existing LAN demo",
+  "accountLabels": [
+    {
+      "id": "loginEmail",
+      "labels": 0
+    },
+    {
+      "id": "loginPassword",
+      "labels": 0
+    },
+    {
+      "id": "regName",
+      "labels": 0
+    },
+    {
+      "id": "regEmail",
+      "labels": 0
+    },
+    {
+      "id": "regPassword",
+      "labels": 0
+    }
+  ],
+  "cartFocusAfterQuantityTab": {
+    "tag": "A",
+    "id": ""
+  },
+  "skipLinks": 0
+}

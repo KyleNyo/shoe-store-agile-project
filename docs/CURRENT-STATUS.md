@@ -1,4 +1,18 @@
-# Sprint 2 — Current status after merge
+# Current project status
+
+Updated 17 October 2026.
+
+- Current presentation source: integrated-demo, including the SCRUM-39–41 quality improvements. Earlier snapshot: presentation-demo-2026-10-17.
+- Current combined review: [PR #7](https://github.com/KyleNyo/shoe-store-agile-project/pull/7), from integrated-demo into main.
+- The presentation application combines the catalogue controls, checkout validation, printable order summary, keyboard focus improvements and resilient images. Its 4 unit tests and 25 Edge browser groups passed locally. The same 25 browser groups passed on Linux Chromium and Firefox in [GitHub run 39058917450](https://github.com/KyleNyo/shoe-store-agile-project/actions/runs/39058917450), application revision 9fa03ca.
+- Sprint 2 has four Done top-level items / 17 points. Follow-up features remain Testing; the sprint is active.
+- See [running and demo instructions](INTEGRATED-DEMO.md), [contributions](../CONTRIBUTIONS.md) and [review order](PR-REVIEW.md).
+- Automated checks are configured in `.github/workflows/tests.yml`; their actual status is shown in PR #7 and GitHub Actions.
+- Keyboard/image/browser audit: [quality improvements](QUALITY-IMPROVEMENTS.md); baseline defect record: SCRUM-47.
+
+## Historical verification record — 15 October 2026
+
+The following notes describe an earlier checkpoint. Current delivery details are above.
 
 Updated 15 October 2026.
 
