@@ -68,6 +68,30 @@ const server = http.createServer((req, res) => {
       await page.reload();
       await page.evaluate(()=>localStorage.clear());
     });
+    await check('Cart edit detects missed row removal or quantity changes and allows reviewed retry', async () => {
+      for(const removed of [false,true]) {
+        await goto('cart.html');
+        await page.evaluate(()=>localStorage.setItem('ss_cart',JSON.stringify([{id:'street',size:42,qty:1}])));
+        await page.reload();
+        // Same-document writes model a storage event that has not been delivered.
+        const saved=await page.evaluate(removed=>{
+          localStorage.setItem('ss_cart',JSON.stringify(removed?[]:[{id:'street',size:42,qty:4}]));
+          return localStorage.getItem('ss_cart');
+        },removed);
+        await page.locator('[data-qty="0"]').fill('3');
+        await page.locator('[data-qty="0"]').press('Tab');
+        assert.match(await page.locator('#cartRecoveryMessage').innerText(),/edit was not applied/);
+        assert.equal(await page.locator('#cartRecovery').evaluate(el=>el===document.activeElement),true);
+        assert.equal(await page.evaluate(()=>localStorage.getItem('ss_cart')),saved);
+        if(removed) assert.match(await page.locator('#cartArea').innerText(),/Your cart is empty/);
+        else {
+          assert.equal(await page.locator('[data-qty="0"]').inputValue(),'4');
+          await page.locator('[data-qty="0"]').fill('3');await page.locator('[data-qty="0"]').press('Tab');
+          assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('ss_cart'))[0].qty),3);
+          assert.match(await page.locator('.cart-summary').innerText(),/194[.,]97/);
+        }
+      }
+    });
     await check('Keyboard skip links, visible focus, labelled controls and mobile menu', async () => {
       for (const file of ['index.html','catalog.html','product-detail.html?id=street','cart.html','login.html','checkout.html']) {
         await goto(file);

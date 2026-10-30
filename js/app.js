@@ -614,6 +614,15 @@ function showCartRecovery(message) {
   };
 }
 
+function updateCartQuantity(id, size, expectedQuantity, quantity) {
+  if (!Number.isInteger(quantity) || quantity < 1 || quantity > MAX_QUANTITY) return "invalid";
+  const current = cart();
+  const item = current.find(row => row.id === id && row.size === size);
+  if (!item || item.qty !== expectedQuantity) return "changed";
+  item.qty = quantity;
+  return saveCart(current) ? "updated" : "save-failed";
+}
+
 function renderCart() {
   const el = document.getElementById("cartArea");
   if (!el) return;
@@ -637,11 +646,16 @@ function renderCart() {
       return;
     }
 
-    const current = cart();
-    const item = current.find(row => row.id === selected.id && row.size === selected.size);
-
-    if (item) item.qty = quantity;
-    if (!saveCart(current)) {
+    const result = updateCartQuantity(selected.id, selected.size, selected.qty, quantity);
+    if (result === "changed") {
+      pendingCartRemoval = null;
+      renderCart();
+      updateNav();
+      showCartRecovery("This cart item changed before your edit was saved. Your edit was not applied. Review the current cart and try again.");
+      document.getElementById("cartRecovery").focus();
+      return;
+    }
+    if (result !== "updated") {
       input.value = selected.qty;
       return;
     }
