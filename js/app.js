@@ -86,7 +86,7 @@ function initImageFallback() {
 }
 
 function card(p, index) {
-  return `<div class="col-sm-6 col-lg-4"><div class="product-card">${productImage(p, false, index < 3)}<div class="card-body"><span class="badge badge-orange">${p.category}</span><h5 class="mt-2">${p.name}</h5><p class="text-muted">${p.description}</p><div class="d-flex justify-content-between align-items-center"><span class="price">${euro(p.price)}</span><a class="btn btn-outline-primary btn-sm" href="product-detail.html?id=${p.id}">View Details</a></div></div></div></div>`;
+  return `<div class="col-sm-6 col-lg-4"><div class="product-card">${productImage(p, false, index < 3)}<div class="card-body"><span class="badge badge-orange">${p.category}</span><h5 class="mt-2">${p.name}</h5><p class="text-muted">${p.description}</p><div class="d-flex justify-content-between align-items-center"><span class="price">${euro(p.price)}</span><a class="btn btn-outline-primary btn-sm" href="product-detail.html?id=${p.id}">View Details</a></div><div class="d-flex flex-wrap gap-2 mt-3"><button type="button" class="btn btn-sm btn-outline-primary" data-wishlist-id="${p.id}" aria-pressed="false">♡ Wishlist</button><button type="button" class="btn btn-sm btn-outline-secondary" data-compare-id="${p.id}" aria-pressed="false">Compare</button></div></div></div></div>`;
 }
 
 function addToCart(id, size) {
@@ -135,6 +135,174 @@ function initHomeSearch() {
       window.location.href = "catalog.html?search=" + encodeURIComponent(searchTerm);
     }
   });
+}
+
+
+const RECENTLY_VIEWED_KEY = "ss_recently_viewed";
+
+function getRecentlyViewed() {
+  const saved = read(RECENTLY_VIEWED_KEY, []);
+  return Array.isArray(saved)
+    ? saved.filter(id => PRODUCTS.some(p => p.id === id)).slice(0, 4)
+    : [];
+}
+
+function saveRecentlyViewed(productId) {
+  const recent = getRecentlyViewed().filter(id => id !== productId);
+  recent.unshift(productId);
+
+  try {
+    write(RECENTLY_VIEWED_KEY, recent.slice(0, 4));
+  } catch {
+    return;
+  }
+}
+
+function renderRecentlyViewed() {
+  const section = document.getElementById("recentlyViewedSection");
+  const container = document.getElementById("recentlyViewedProducts");
+  const clearButton = document.getElementById("clearRecentlyViewed");
+
+  if (!section || !container || !clearButton) return;
+
+  const products = getRecentlyViewed()
+    .map(id => PRODUCTS.find(p => p.id === id))
+    .filter(Boolean);
+
+  section.hidden = products.length === 0;
+  container.innerHTML = products.map((p, index) => card(p, index)).join("");
+  updateShoppingButtons();
+
+  clearButton.onclick = () => {
+    try {
+      localStorage.removeItem(RECENTLY_VIEWED_KEY);
+    } catch {
+      return;
+    }
+    renderRecentlyViewed();
+  };
+}
+
+const WISHLIST_KEY = "ss_wishlist";
+const COMPARE_KEY = "ss_compare";
+
+function validProductIds(key, limit) {
+  const ids = read(key, []);
+  return Array.isArray(ids) ? [...new Set(ids.filter(id => PRODUCTS.some(p => p.id === id)))].slice(0, limit) : [];
+}
+
+function storeProductIds(key, ids) {
+  try {
+    write(key, ids);
+    return true;
+  } catch {
+    alert("Your selection could not be saved. Check your browser storage settings.");
+    return false;
+  }
+}
+
+function updateShoppingButtons() {
+  const wishlist = validProductIds(WISHLIST_KEY, PRODUCTS.length);
+  const compared = validProductIds(COMPARE_KEY, 2);
+  document.querySelectorAll("[data-wishlist-id]").forEach(button => {
+    const selected = wishlist.includes(button.dataset.wishlistId);
+    button.setAttribute("aria-pressed", String(selected));
+    button.textContent = selected ? "♥ Saved" : "♡ Wishlist";
+  });
+  document.querySelectorAll("[data-compare-id]").forEach(button => {
+    const selected = compared.includes(button.dataset.compareId);
+    button.setAttribute("aria-pressed", String(selected));
+    button.textContent = selected ? "✓ Comparing" : "Compare";
+  });
+  const count = document.getElementById("wishlistCount");
+  if (count) count.textContent = String(wishlist.length);
+}
+
+function renderWishlist() {
+  const section = document.getElementById("wishlistSection");
+  const grid = document.getElementById("wishlistProducts");
+  if (!section || !grid) return;
+  const products = validProductIds(WISHLIST_KEY, PRODUCTS.length).map(id => PRODUCTS.find(p => p.id === id));
+  section.hidden = products.length === 0;
+  grid.innerHTML = products.map((p, i) => card(p, i)).join("");
+  updateShoppingButtons();
+}
+
+function renderComparison() {
+  const section = document.getElementById("comparisonSection");
+  const content = document.getElementById("comparisonContent");
+  if (!section || !content) return;
+  const products = validProductIds(COMPARE_KEY, 2).map(id => PRODUCTS.find(p => p.id === id));
+  section.hidden = products.length === 0;
+  if (products.length < 2) {
+    content.textContent = "Select one more shoe using Compare to see them side by side.";
+  } else {
+    const fields = [
+      ["Name", p => p.name],
+      ["Price", p => euro(p.price)],
+      ["Category", p => p.category],
+      ["Sizes (EU)", p => p.sizes.join(", ")],
+      ["Description", p => p.description]
+    ];
+    const table = document.createElement("table");
+    table.className = "table table-bordered align-middle";
+    const caption = document.createElement("caption");
+    caption.textContent = "Comparison of two SoleStyle shoes";
+    table.append(caption);
+    const tbody = document.createElement("tbody");
+    fields.forEach(([label, getter]) => {
+      const row = document.createElement("tr");
+      const heading = document.createElement("th");
+      heading.scope = "row";
+      heading.textContent = label;
+      row.append(heading);
+      products.forEach(p => {
+        const cell = document.createElement("td");
+        cell.textContent = getter(p);
+        row.append(cell);
+      });
+      tbody.append(row);
+    });
+    table.append(tbody);
+    content.replaceChildren(table);
+  }
+  updateShoppingButtons();
+}
+
+function initShoppingFeatures() {
+  document.addEventListener("click", event => {
+    const wishlistButton = event.target.closest("[data-wishlist-id]");
+    const compareButton = event.target.closest("[data-compare-id]");
+    if (wishlistButton) {
+      const id = wishlistButton.dataset.wishlistId;
+      const ids = validProductIds(WISHLIST_KEY, PRODUCTS.length);
+      const next = ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id];
+      if (storeProductIds(WISHLIST_KEY, next)) {
+        renderWishlist();
+        updateShoppingButtons();
+      }
+    }
+    if (compareButton) {
+      const id = compareButton.dataset.compareId;
+      const ids = validProductIds(COMPARE_KEY, 2);
+      const next = ids.includes(id) ? ids.filter(x => x !== id) : ids.length < 2 ? [...ids, id] : null;
+      if (!next) {
+        alert("You can compare two shoes at a time. Clear the comparison to choose different shoes.");
+        return;
+      }
+      if (storeProductIds(COMPARE_KEY, next)) {
+        renderComparison();
+        updateShoppingButtons();
+      }
+    }
+  });
+  const clearCompare = document.getElementById("clearComparison");
+  if (clearCompare) clearCompare.addEventListener("click", () => {
+    if (storeProductIds(COMPARE_KEY, [])) renderComparison();
+  });
+  renderWishlist();
+  renderComparison();
+  updateShoppingButtons();
 }
 
 function renderHome() {
@@ -282,7 +450,14 @@ function renderDetail() {
     return;
   }
 
+  saveRecentlyViewed(p.id);
   el.innerHTML = `<div class="row g-4"><div class="col-md-6">${productImage(p, true)}</div><div class="col-md-6"><span class="badge badge-orange">${p.category}</span><h2 class="mt-2">${p.name}</h2><p>${p.description}</p><p class="price">${euro(p.price)}</p><label class="form-label" for="shoeSize">Size</label><select id="shoeSize" class="form-select mb-3">${p.sizes.map(s => `<option>${s}</option>`).join("")}</select><button id="addBtn" class="btn btn-primary">Add to Cart</button></div></div>`;
+
+  const featureButtons = document.createElement("div");
+  featureButtons.className = "d-flex flex-wrap gap-2 mt-3";
+  featureButtons.innerHTML = `<button type="button" class="btn btn-outline-primary" data-wishlist-id="${p.id}">♡ Wishlist</button><button type="button" class="btn btn-outline-secondary" data-compare-id="${p.id}">Compare</button>`;
+  document.getElementById("addBtn").after(featureButtons);
+  updateShoppingButtons();
 
   const selectedSize = safeState.get("size");
   const status = document.createElement("p");
@@ -800,8 +975,11 @@ document.addEventListener("DOMContentLoaded", () => {
   initImageFallback();
   updateNav();
   renderHome();
+  renderRecentlyViewed();
+  initShoppingFeatures();
   initHomeSearch();
   renderCatalog();
+  updateShoppingButtons();
   renderDetail();
   initAuth();
   renderCart();
