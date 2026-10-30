@@ -37,6 +37,42 @@ const server = http.createServer((req, res) => {
   const check = async(name, fn) => {await fn(); results.push(name); console.log('PASS ' + name);};
   const goto = file => page.goto(base + '/' + file);
   try {
+    await check('Product add feedback stops showing old quantities after another-tab cart edits', async () => {
+      await goto('product-detail.html?id=street');await page.evaluate(()=>localStorage.clear());await page.reload();
+      await page.locator('#addBtn').click();
+      assert.match(await page.locator('#addCartStatus').innerText(),/1 pair/);
+      const other=await context.newPage();
+      try {
+        await other.goto(base+'/cart.html');
+        await other.locator('[data-qty="0"]').fill('3');await other.locator('[data-qty="0"]').press('Tab');
+        await page.getByText('Cart refreshed. Review your cart for current quantities.',{exact:true}).waitFor({timeout:3000});
+        assert.equal(await page.locator('[data-cart-count]').innerText(),'3');
+        assert.equal(await page.locator('#viewCartLink').isVisible(),true);
+        await page.locator('#viewCartLink').focus();
+        await other.locator('[data-remove="0"]').click();
+        await page.locator('#viewCartLink').waitFor({state:'hidden',timeout:3000});
+        assert.equal(await page.locator('[data-cart-count]').innerText(),'0');
+        assert.equal(await page.locator('#addCartStatus').evaluate(el=>el===document.activeElement),true);
+        assert.doesNotMatch(await page.locator('#addCartStatus').innerText(),/pair|added to cart/);
+        assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('ss_cart'))),[]);
+      } finally {await other.close();}
+    });
+    await check('Cached product feedback refreshes without creating success on untouched pages', async () => {
+      await goto('product-detail.html?id=street');
+      await page.evaluate(()=>window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true})));
+      assert.equal(await page.locator('#addCartStatus').innerText(),'');
+      await page.locator('#addBtn').click();
+      const saved=await page.evaluate(()=>{
+        localStorage.setItem('ss_cart','[]');
+        window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:false}));
+        return localStorage.getItem('ss_cart');
+      });
+      assert.match(await page.locator('#addCartStatus').innerText(),/1 pair/);
+      await page.evaluate(()=>window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true})));
+      assert.match(await page.locator('#addCartStatus').innerText(),/Cart refreshed/);
+      assert.equal(await page.locator('#viewCartLink').isVisible(),false);
+      assert.equal(await page.evaluate(()=>localStorage.getItem('ss_cart')),saved);
+    });
     await check('All seven store pages declare only local scripts, styles and images', async () => {
       for(const file of ['index.html','catalog.html','product-detail.html','cart.html','login.html','checkout.html','confirmation.html']) {
         const source=fs.readFileSync(path.join(root,file),'utf8');
