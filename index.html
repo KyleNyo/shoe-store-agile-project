@@ -97,6 +97,29 @@
         <div class="row g-4" id="featuredProducts"></div>
     </section>
 
+<section class="container mt-5" id="recentlyViewedSection" hidden>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3 class="section-title mb-0">Recently Viewed Shoes</h3>
+        <button type="button" id="clearRecentlyViewed" class="btn btn-outline-secondary btn-sm">
+            Clear History
+        </button>
+    </div>
+    <div class="row g-4" id="recentlyViewedProducts"></div>
+</section>
+
+<section class="container mt-5" id="wishlistSection" hidden>
+  <h3 class="section-title">My Wishlist <span class="badge bg-secondary" id="wishlistCount">0</span></h3>
+  <p>Saved shoes stay in this browser until you remove them.</p>
+  <div class="row g-4" id="wishlistProducts"></div>
+</section>
+<section class="container mt-5 mb-5" id="comparisonSection" hidden>
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="section-title mb-0">Compare Shoes</h3>
+    <button type="button" class="btn btn-outline-secondary btn-sm" id="clearComparison">Clear Comparison</button>
+  </div>
+  <div class="table-responsive" id="comparisonContent" aria-live="polite"></div>
+</section>
+
 <!-- Sprint 2: Customer benefits section -->
 <section class="container my-5">
   <h3 class="section-title text-center mb-4">
