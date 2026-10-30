@@ -23,6 +23,13 @@ const server = http.createServer((req, res) => {
   const base = `http://127.0.0.1:${server.address().port}`;
   const browser = await (channel === 'firefox' ? firefox : chromium).launch({...(['chromium','firefox'].includes(channel) ? {} : {channel}), headless:true});
   const context = await browser.newContext();
+  const blockedExternalHosts = new Set();
+  await context.route('**/*', route => {
+    const url = new URL(route.request().url());
+    if (url.hostname === '127.0.0.1') return route.continue();
+    blockedExternalHosts.add(url.hostname);
+    return route.abort();
+  });
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
@@ -30,6 +37,16 @@ const server = http.createServer((req, res) => {
   const check = async(name, fn) => {await fn(); results.push(name); console.log('PASS ' + name);};
   const goto = file => page.goto(base + '/' + file);
   try {
+    await check('All seven store pages declare only local scripts, styles and images', async () => {
+      for(const file of ['index.html','catalog.html','product-detail.html','cart.html','login.html','checkout.html','confirmation.html']) {
+        const source=fs.readFileSync(path.join(root,file),'utf8');
+        const resources=[...source.matchAll(/<(?:script|link|img)\b[^>]*\b(?:src|href)=["']([^"']+)["']/gi)].map(match=>match[1]);
+        assert.ok(resources.length>0,file);
+        for(const resource of resources) assert.equal(new URL(resource,base).origin,base,`${file}: ${resource}`);
+        await goto(file);
+        assert.equal(await page.locator('body').isVisible(),true);
+      }
+    });
     await check('Shopping selections synchronise across tabs without losing focus or cart data', async () => {
       await goto('catalog.html');await page.evaluate(()=>localStorage.clear());await page.reload();
       const before=await page.evaluate(()=>({cart:localStorage.getItem('ss_cart'),order:localStorage.getItem('ss_last_order')}));
@@ -935,6 +952,6 @@ const server = http.createServer((req, res) => {
       }
     });
     assert.deepEqual(errors,[]);
-    fs.writeFileSync(path.join(evidence,'results.json'),JSON.stringify({browser:await browser.version(),passed:results,pageErrors:errors},null,2));
+    fs.writeFileSync(path.join(evidence,'results.json'),JSON.stringify({browser:await browser.version(),passed:results,pageErrors:errors,networkPolicy:'All non-localhost requests blocked throughout the suite',blockedExternalHosts:[...blockedExternalHosts].sort()},null,2));
   } finally {await browser.close();server.close();}
 })().catch(error=>{console.error(error);server.close();process.exitCode=1;});
