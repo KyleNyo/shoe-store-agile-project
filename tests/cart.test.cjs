@@ -16,6 +16,29 @@ test('valid persisted cart survives and counts separate sizes', () => {
   run("addToCart('street', '43')");
   assert.deepEqual(run('cart()'), [{id:'street',size:42,qty:3},{id:'street',size:43,qty:1}]);
 });
+test('quantity edit refuses a removed row without changing the remaining cart', () => {
+  const run=app([{id:'runner',size:40,qty:2}]);
+  assert.equal(run("updateCartQuantity('street',42,1,3)"),'changed');
+  assert.deepEqual(run('cart()'),[{id:'runner',size:40,qty:2}]);
+});
+test('quantity edit refuses a newer saved quantity and permits reviewed retry', () => {
+  const run=app([{id:'street',size:42,qty:4},{id:'runner',size:40,qty:2}]);
+  assert.equal(run("updateCartQuantity('street',42,1,3)"),'changed');
+  assert.equal(run('cart()[0].qty'),4);
+  assert.equal(run("updateCartQuantity('street',42,4,3)"),'updated');
+  assert.deepEqual(run('cart()'),[{id:'street',size:42,qty:3},{id:'runner',size:40,qty:2}]);
+});
+test('failed quantity save preserves the stored quantity', () => {
+  const run=app([{id:'street',size:42,qty:1}]);
+  run("localStorage.setItem=()=>{throw new Error('Full')}; undefined");
+  assert.equal(run("updateCartQuantity('street',42,1,3)"),'save-failed');
+  assert.equal(run('cart()[0].qty'),1);
+});
+test('invalid quantity edits cannot change stored data', () => {
+  const run=app([{id:'street',size:42,qty:1}]);
+  for(const qty of [0,-1,1.5,100]) assert.equal(run(`updateCartQuantity('street',42,1,${qty})`),'invalid');
+  assert.equal(run('cart()[0].qty'),1);
+});
 test('non-array saved data recovers to an empty cart', () => assert.deepEqual(app({bad:true})('cart()'), []));
 test('unknown products, invalid sizes and quantities are rejected', () => {
   const run = app([{id:'missing',size:42,qty:1},{id:'street',size:'<img>',qty:1},{id:'street',size:42,qty:1.5},{id:'street',size:43,qty:-1},{id:'runner',size:42,qty:2}]);
