@@ -179,7 +179,7 @@ function renderRecentlyViewed() {
     } catch {
       return;
     }
-    renderRecentlyViewed();
+    refreshShoppingViews();
   };
 }
 
@@ -269,7 +269,31 @@ function renderComparison() {
   updateShoppingButtons();
 }
 
+function refreshShoppingViews() {
+  const active = document.activeElement;
+  const wishlistId = active?.dataset?.wishlistId;
+  const compareId = active?.dataset?.compareId;
+  renderRecentlyViewed();
+  renderWishlist();
+  renderComparison();
+  updateShoppingButtons();
+  if (active && active.getClientRects().length === 0) {
+    const replacement = [...document.querySelectorAll("[data-wishlist-id], [data-compare-id]")]
+      .find(button => button.getClientRects().length &&
+        (wishlistId ? button.dataset.wishlistId === wishlistId : compareId && button.dataset.compareId === compareId));
+    (replacement || document.getElementById("productSearch") || document.getElementById("mainContent"))?.focus();
+  }
+}
+
 function initShoppingFeatures() {
+  window.addEventListener("storage", event => {
+    if (event.storageArea === localStorage && [null, WISHLIST_KEY, COMPARE_KEY, RECENTLY_VIEWED_KEY].includes(event.key)) {
+      refreshShoppingViews();
+    }
+  });
+  window.addEventListener("pageshow", event => {
+    if (event.persisted) refreshShoppingViews();
+  });
   document.addEventListener("click", event => {
     const wishlistButton = event.target.closest("[data-wishlist-id]");
     const compareButton = event.target.closest("[data-compare-id]");
@@ -278,8 +302,7 @@ function initShoppingFeatures() {
       const ids = validProductIds(WISHLIST_KEY, PRODUCTS.length);
       const next = ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id];
       if (storeProductIds(WISHLIST_KEY, next)) {
-        renderWishlist();
-        updateShoppingButtons();
+        refreshShoppingViews();
       }
     }
     if (compareButton) {
@@ -291,14 +314,13 @@ function initShoppingFeatures() {
         return;
       }
       if (storeProductIds(COMPARE_KEY, next)) {
-        renderComparison();
-        updateShoppingButtons();
+        refreshShoppingViews();
       }
     }
   });
   const clearCompare = document.getElementById("clearComparison");
   if (clearCompare) clearCompare.addEventListener("click", () => {
-    if (storeProductIds(COMPARE_KEY, [])) renderComparison();
+    if (storeProductIds(COMPARE_KEY, [])) refreshShoppingViews();
   });
   renderWishlist();
   renderComparison();

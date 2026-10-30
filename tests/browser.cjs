@@ -30,6 +30,77 @@ const server = http.createServer((req, res) => {
   const check = async(name, fn) => {await fn(); results.push(name); console.log('PASS ' + name);};
   const goto = file => page.goto(base + '/' + file);
   try {
+    await check('Shopping selections synchronise across tabs without losing focus or cart data', async () => {
+      await goto('catalog.html');await page.evaluate(()=>localStorage.clear());await page.reload();
+      const before=await page.evaluate(()=>({cart:localStorage.getItem('ss_cart'),order:localStorage.getItem('ss_last_order')}));
+      const other=await context.newPage();
+      try {
+        await other.goto(base+'/catalog.html');
+        await other.locator('#productGrid [data-wishlist-id="street"]').click();
+        await page.locator('#wishlistSection:not([hidden])').waitFor({timeout:3000});
+        assert.equal(await page.locator('#wishlistCount').innerText(),'1');
+        assert.equal(await page.locator('#productGrid [data-wishlist-id="street"]').getAttribute('aria-pressed'),'true');
+        await other.locator('#productGrid [data-compare-id="street"]').click();
+        await other.locator('#productGrid [data-compare-id="runner"]').click();
+        await page.locator('#comparisonContent table').waitFor({timeout:3000});
+        assert.match(await page.locator('#comparisonContent').innerText(),/Street Classic/);
+        assert.match(await page.locator('#comparisonContent').innerText(),/Velocity Runner/);
+        await page.locator('#wishlistProducts [data-wishlist-id="street"]').focus();
+        await other.locator('#productGrid [data-wishlist-id="street"]').click();
+        await page.locator('#wishlistSection').waitFor({state:'hidden',timeout:3000});
+        assert.equal(await page.locator('#productGrid [data-wishlist-id="street"]').evaluate(el=>el===document.activeElement),true);
+        await page.locator('#clearComparison').focus();
+        await other.locator('#clearComparison').click();
+        await page.locator('#comparisonSection').waitFor({state:'hidden',timeout:3000});
+        assert.equal(await page.locator('#productSearch').evaluate(el=>el===document.activeElement),true);
+        assert.deepEqual(await page.evaluate(()=>({cart:localStorage.getItem('ss_cart'),order:localStorage.getItem('ss_last_order')})),before);
+        await goto('index.html');
+        await other.goto(base+'/product-detail.html?id=trail');
+        await page.locator('#recentlyViewedProducts [href="product-detail.html?id=trail"]').waitFor({timeout:3000});
+        await other.evaluate(()=>localStorage.clear());
+        await page.locator('#recentlyViewedSection').waitFor({state:'hidden',timeout:3000});
+      } finally {await other.close();await page.evaluate(()=>localStorage.clear());}
+    });
+    await check('Cached shopping views re-read selections after missed updates', async () => {
+      await goto('index.html');await page.evaluate(()=>localStorage.clear());await page.reload();
+      const saved=await page.evaluate(()=>{
+        localStorage.setItem('ss_wishlist',JSON.stringify(['street']));
+        localStorage.setItem('ss_compare',JSON.stringify(['street','runner']));
+        localStorage.setItem('ss_recently_viewed',JSON.stringify(['trail']));
+        return {wishlist:localStorage.getItem('ss_wishlist'),compare:localStorage.getItem('ss_compare'),recent:localStorage.getItem('ss_recently_viewed')};
+      });
+      await page.evaluate(()=>window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:false})));
+      assert.equal(await page.locator('#wishlistSection').isVisible(),false);
+      await page.evaluate(()=>window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true})));
+      assert.equal(await page.locator('#wishlistCount').innerText(),'1');
+      assert.equal(await page.locator('#comparisonContent table').count(),1);
+      assert.match(await page.locator('#recentlyViewedProducts').innerText(),/Trail Motion/);
+      assert.deepEqual(await page.evaluate(()=>({wishlist:localStorage.getItem('ss_wishlist'),compare:localStorage.getItem('ss_compare'),recent:localStorage.getItem('ss_recently_viewed')})),saved);
+      await page.evaluate(()=>localStorage.clear());
+    });
+    await check('Local shopping removal keeps keyboard focus and compare limits survive refresh', async () => {
+      await goto('catalog.html');await page.evaluate(()=>localStorage.clear());await page.reload();
+      await page.locator('#productGrid [data-wishlist-id="street"]').click();
+      await page.locator('#wishlistProducts [data-wishlist-id="street"]').focus();
+      await page.keyboard.press('Enter');
+      assert.equal(await page.locator('#wishlistSection').isVisible(),false);
+      assert.equal(await page.locator('#productGrid [data-wishlist-id="street"]').evaluate(el=>el===document.activeElement),true);
+      await page.locator('#productGrid [data-compare-id="street"]').click();
+      await page.locator('#productGrid [data-compare-id="runner"]').click();
+      const selected=await page.evaluate(()=>localStorage.getItem('ss_compare'));
+      await page.locator('#productGrid [data-compare-id="trail"]').click();
+      assert.equal(await page.evaluate(()=>localStorage.getItem('ss_compare')),selected);
+      assert.equal(await page.locator('#comparisonContent table tbody tr').first().locator('td').count(),2);
+      await page.locator('#clearComparison').focus();await page.keyboard.press('Enter');
+      assert.equal(await page.locator('#comparisonSection').isVisible(),false);
+      assert.equal(await page.locator('#productSearch').evaluate(el=>el===document.activeElement),true);
+      const before=await page.evaluate(()=>({wishlist:localStorage.getItem('ss_wishlist'),compare:localStorage.getItem('ss_compare')}));
+      await page.evaluate(()=>{Storage.prototype.setItem=function(){throw new Error('Full');};});
+      await page.locator('#productGrid [data-wishlist-id="street"]').click();
+      assert.equal(await page.locator('#productGrid [data-wishlist-id="street"]').getAttribute('aria-pressed'),'false');
+      assert.deepEqual(await page.evaluate(()=>({wishlist:localStorage.getItem('ss_wishlist'),compare:localStorage.getItem('ss_compare')})),before);
+      await page.reload();await page.evaluate(()=>localStorage.clear());
+    });
     await check('Catalogue redraw keeps wishlist and comparison selections through filters and reset', async () => {
       await goto('catalog.html');
       await page.evaluate(()=>{localStorage.removeItem('ss_wishlist');localStorage.removeItem('ss_compare');});
