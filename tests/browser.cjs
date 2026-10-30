@@ -37,6 +37,47 @@ const server = http.createServer((req, res) => {
   const check = async(name, fn) => {await fn(); results.push(name); console.log('PASS ' + name);};
   const goto = file => page.goto(base + '/' + file);
   try {
+    await check('Cart product navigation retains the selected size and returns to the cart', async () => {
+      await goto('cart.html');await page.evaluate(()=>localStorage.clear());
+      await page.evaluate(()=>localStorage.setItem('ss_cart',JSON.stringify([{id:'street',size:43,qty:1}])));await page.reload();
+      const saved=await page.evaluate(()=>localStorage.getItem('ss_cart'));
+      await page.locator('#cartArea a[href^="product-detail.html"]').click();
+      await page.waitForURL('**/product-detail.html?*');
+      assert.equal(await page.locator('#shoeSize').inputValue(),'43');
+      assert.equal(await page.evaluate(()=>localStorage.getItem('ss_cart')),saved);
+      await page.getByRole('link',{name:'Back to cart',exact:true}).click();await page.waitForURL('**/cart.html');
+      await page.locator('#cartArea a[href^="product-detail.html"]').click();await page.waitForURL('**/product-detail.html?*');
+      await page.locator('#addBtn').click();
+      assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('ss_cart'))),[{id:'street',size:43,qty:2}]);
+      await page.evaluate(()=>localStorage.clear());
+    });
+    await check('Wishlist product links preserve catalogue controls after redraw and clear stale return filters on reset', async () => {
+      await goto('catalog.html');await page.evaluate(()=>localStorage.clear());await page.reload();
+      await page.selectOption('#categoryFilter','Sneakers');await page.selectOption('#sizeFilter','42');
+      await page.selectOption('#priceSort','price-desc');await page.fill('#minPrice','60');await page.fill('#maxPrice','80');
+      await page.fill('#productSearch','street');
+      await page.locator('#productGrid [data-wishlist-id="street"]').click();
+      const saved=await page.evaluate(()=>localStorage.getItem('ss_wishlist'));
+      await page.locator('#wishlistProducts a').click();await page.waitForURL('**/product-detail.html?*');
+      assert.equal(await page.locator('#shoeSize').inputValue(),'42');
+      await page.getByRole('link',{name:'Back to catalogue',exact:true}).click();await page.waitForURL('**/catalog.html?*');
+      for(const [id,value] of [['categoryFilter','Sneakers'],['sizeFilter','42'],['priceSort','price-desc'],['minPrice','60'],['maxPrice','80'],['productSearch','street']]) assert.equal(await page.locator('#'+id).inputValue(),value);
+      await page.locator('#resetFilters').click();
+      assert.equal(new URL(await page.locator('#wishlistProducts a').getAttribute('href'),page.url()).searchParams.has('catalog'),false);
+      assert.equal(await page.evaluate(()=>localStorage.getItem('ss_wishlist')),saved);
+      await page.evaluate(()=>localStorage.clear());
+    });
+    await check('Product return destinations stay local and unavailable cart sizes fall back safely', async () => {
+      await goto('product-detail.html?id=street&from=cart&size=999');
+      assert.equal(await page.locator('#shoeSize').inputValue(),'39');
+      assert.equal(await page.getByRole('link',{name:'Back to cart',exact:true}).getAttribute('href'),'cart.html');
+      await goto('product-detail.html?id=street&from=https%3A%2F%2Fexample.com&size=43');
+      assert.equal(await page.locator('#shoeSize').inputValue(),'39');
+      assert.equal(await page.getByRole('link',{name:'Back to catalogue',exact:true}).getAttribute('href'),'catalog.html');
+      await goto('product-detail.html?id=missing&from=cart&size=43');
+      assert.match(await page.locator('#productDetail').innerText(),/Product not found/);
+      assert.equal(await page.getByRole('link',{name:'Back to cart',exact:true}).getAttribute('href'),'cart.html');
+    });
     await check('Product add feedback stops showing old quantities after another-tab cart edits', async () => {
       await goto('product-detail.html?id=street');await page.evaluate(()=>localStorage.clear());await page.reload();
       await page.locator('#addBtn').click();

@@ -89,6 +89,20 @@ function card(p, index) {
   return `<div class="col-sm-6 col-lg-4"><div class="product-card">${productImage(p, false, index < 3)}<div class="card-body"><span class="badge badge-orange">${p.category}</span><h5 class="mt-2">${p.name}</h5><p class="text-muted">${p.description}</p><div class="d-flex justify-content-between align-items-center"><span class="price">${euro(p.price)}</span><a class="btn btn-outline-primary btn-sm" href="product-detail.html?id=${p.id}">View Details</a></div><div class="d-flex flex-wrap gap-2 mt-3"><button type="button" class="btn btn-sm btn-outline-primary" data-wishlist-id="${p.id}" aria-pressed="false">♡ Wishlist</button><button type="button" class="btn btn-sm btn-outline-secondary" data-compare-id="${p.id}" aria-pressed="false">Compare</button></div></div></div></div>`;
 }
 
+function setCatalogReturnLinks(root, values) {
+  if (!root) return;
+  const state = new URLSearchParams();
+  for (const [key, value] of values) {
+    if (["search", "category", "sort", "min", "max", "size"].includes(key) && value) state.set(key, value);
+  }
+  root.querySelectorAll('a[href^="product-detail.html"]').forEach(link => {
+    const detail = new URL(link.href);
+    if (state.size) detail.searchParams.set("catalog", state.toString());
+    else detail.searchParams.delete("catalog");
+    link.setAttribute("href", "product-detail.html" + detail.search);
+  });
+}
+
 function addToCart(id, size) {
   const product = PRODUCTS.find(p => p.id === id);
   size = Number(size);
@@ -225,6 +239,7 @@ function renderWishlist() {
   const products = validProductIds(WISHLIST_KEY, PRODUCTS.length).map(id => PRODUCTS.find(p => p.id === id));
   section.hidden = products.length === 0;
   grid.innerHTML = products.map((p, i) => card(p, i)).join("");
+  if (document.getElementById("productGrid")) setCatalogReturnLinks(grid, new URLSearchParams(location.search));
   updateShoppingButtons();
 }
 
@@ -410,13 +425,8 @@ function renderCatalog() {
 
     grid.innerHTML = list.map(card).join("");
     updateShoppingButtons();
-    grid.querySelectorAll('a[href^="product-detail.html"]').forEach(link => {
-      const detail = new URL(link.href);
-      const state = new URLSearchParams();
-      for (const [key, value] of controls) if (value) state.set(key, value);
-      if (state.size) detail.searchParams.set("catalog", state.toString());
-      link.setAttribute("href", "product-detail.html" + detail.search);
-    });
+    setCatalogReturnLinks(grid, controls);
+    setCatalogReturnLinks(document.getElementById("wishlistProducts"), controls);
 
     message.innerHTML = list.length
       ? ""
@@ -453,7 +463,9 @@ function renderDetail() {
   const el = document.getElementById("productDetail");
   if (!el) return;
 
-  const p = PRODUCTS.find(x => x.id === new URLSearchParams(location.search).get("id"));
+  const params = new URLSearchParams(location.search);
+  const p = PRODUCTS.find(x => x.id === params.get("id"));
+  const fromCart = params.get("from") === "cart";
 
   // Only carry known catalogue controls; never accept a destination URL.
   const state = new URLSearchParams(new URLSearchParams(location.search).get("catalog") || "");
@@ -462,10 +474,10 @@ function renderDetail() {
     if (state.has(key)) safeState.set(key, state.get(key));
   }
   const back = document.createElement("a");
-  back.id = "returnToCatalog";
+  back.id = fromCart ? "returnToCart" : "returnToCatalog";
   back.className = "btn btn-outline-primary mb-3";
-  back.textContent = "Back to catalogue";
-  back.href = "catalog.html" + (safeState.size ? "?" + safeState.toString() : "");
+  back.textContent = fromCart ? "Back to cart" : "Back to catalogue";
+  back.href = fromCart ? "cart.html" : "catalog.html" + (safeState.size ? "?" + safeState.toString() : "");
   el.before(back);
 
   if (!p) {
@@ -482,7 +494,7 @@ function renderDetail() {
   document.getElementById("addBtn").after(featureButtons);
   updateShoppingButtons();
 
-  const selectedSize = safeState.get("size");
+  const selectedSize = fromCart ? params.get("size") : safeState.get("size");
   const status = document.createElement("p");
   status.id = "addCartStatus";
   status.setAttribute("role", "status");
@@ -657,7 +669,7 @@ function renderCart() {
     return;
   }
 
-  el.innerHTML = `<p id="cartMessage" role="status" aria-live="polite"></p><div class="table-responsive"><table class="table align-middle"><thead><tr><th scope="col">Product</th><th scope="col">Size</th><th scope="col">Price</th><th scope="col">Quantity</th><th scope="col">Subtotal</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead><tbody>${rows.map((row, index) => `<tr><td><a href="product-detail.html?id=${row.id}">${row.p.name}</a></td><td>${row.size}</td><td>${euro(row.p.price)}</td><td><input class="form-control cart-quantity" aria-label="Quantity for ${row.p.name}, size ${row.size}" type="number" min="1" max="${MAX_QUANTITY}" step="1" value="${row.qty}" data-qty="${index}"></td><td>${euro(subtotalCents(row) / 100)}</td><td><button class="btn btn-sm btn-outline-danger" aria-label="Remove ${row.p.name}, size ${row.size}" data-remove="${index}">Remove</button></td></tr>`).join("")}</tbody></table></div><div class="d-flex justify-content-end"><div class="order-summary cart-summary"><h5>Total: ${euro(totalPrice(rows))}</h5><a href="checkout.html" class="btn btn-primary w-100 mt-2">Proceed to Checkout</a></div></div>`;
+  el.innerHTML = `<p id="cartMessage" role="status" aria-live="polite"></p><div class="table-responsive"><table class="table align-middle"><thead><tr><th scope="col">Product</th><th scope="col">Size</th><th scope="col">Price</th><th scope="col">Quantity</th><th scope="col">Subtotal</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead><tbody>${rows.map((row, index) => `<tr><td><a href="product-detail.html?id=${row.id}&size=${row.size}&from=cart">${row.p.name}</a></td><td>${row.size}</td><td>${euro(row.p.price)}</td><td><input class="form-control cart-quantity" aria-label="Quantity for ${row.p.name}, size ${row.size}" type="number" min="1" max="${MAX_QUANTITY}" step="1" value="${row.qty}" data-qty="${index}"></td><td>${euro(subtotalCents(row) / 100)}</td><td><button class="btn btn-sm btn-outline-danger" aria-label="Remove ${row.p.name}, size ${row.size}" data-remove="${index}">Remove</button></td></tr>`).join("")}</tbody></table></div><div class="d-flex justify-content-end"><div class="order-summary cart-summary"><h5>Total: ${euro(totalPrice(rows))}</h5><a href="checkout.html" class="btn btn-primary w-100 mt-2">Proceed to Checkout</a></div></div>`;
 
   el.querySelectorAll("[data-qty]").forEach(input => input.onchange = () => {
     const quantity = Number(input.value);
