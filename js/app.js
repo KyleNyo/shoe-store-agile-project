@@ -709,6 +709,18 @@ function renderCart() {
 function initCartSync() {
   const refresh = (restored = false) => {
     updateNav();
+    const status = document.getElementById("addCartStatus");
+    if (status?.textContent) {
+      const link = document.getElementById("viewCartLink");
+      const hadLinkFocus = document.activeElement === link;
+      status.textContent = "Cart refreshed. Review your cart for current quantities.";
+      status.className = "text-muted mt-3";
+      link.hidden = cart().length === 0;
+      if (hadLinkFocus && link.hidden) {
+        status.setAttribute("tabindex", "-1");
+        status.focus();
+      }
+    }
     const area = document.getElementById("cartArea");
     if (!area) return;
     const active = document.activeElement;
