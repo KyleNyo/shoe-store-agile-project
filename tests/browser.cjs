@@ -30,6 +30,41 @@ const server = http.createServer((req, res) => {
   const check = async(name, fn) => {await fn(); results.push(name); console.log('PASS ' + name);};
   const goto = file => page.goto(base + '/' + file);
   try {
+    await check('Catalogue redraw keeps wishlist and comparison selections through filters and reset', async () => {
+      await goto('catalog.html');
+      await page.evaluate(()=>{localStorage.removeItem('ss_wishlist');localStorage.removeItem('ss_compare');});
+      await page.reload();
+      const saved=page.locator('#productGrid [data-wishlist-id="street"]');
+      const compared=page.locator('#productGrid [data-compare-id="street"]');
+      await saved.click();await compared.click();
+      const snapshot=await page.evaluate(()=>({wishlist:localStorage.getItem('ss_wishlist'),compare:localStorage.getItem('ss_compare')}));
+      const selected=async()=>{
+        assert.equal(await saved.getAttribute('aria-pressed'),'true');
+        assert.match(await saved.innerText(),/Saved/);
+        assert.equal(await compared.getAttribute('aria-pressed'),'true');
+        assert.match(await compared.innerText(),/Comparing/);
+        assert.equal(await page.locator('#wishlistCount').innerText(),'1');
+        assert.deepEqual(await page.evaluate(()=>({wishlist:localStorage.getItem('ss_wishlist'),compare:localStorage.getItem('ss_compare')})),snapshot);
+      };
+      await selected();
+      await page.selectOption('#priceSort','price-desc');await selected();
+      await page.selectOption('#categoryFilter','Sneakers');await selected();
+      await page.selectOption('#sizeFilter','42');await selected();
+      await page.fill('#minPrice','60');await page.fill('#maxPrice','80');await selected();
+      await page.fill('#productSearch','street');await selected();
+      await page.fill('#productSearch','no-match');
+      assert.equal(await page.locator('#productGrid .product-card').count(),0);
+      await page.locator('#resetFilters').click();await selected();
+      await page.fill('#minPrice','100');await page.fill('#maxPrice','60');
+      await page.locator('#resetFilters').click();await selected();
+      await page.reload();await selected();
+      await saved.click();await compared.click();
+      assert.equal(await saved.getAttribute('aria-pressed'),'false');
+      assert.equal(await compared.getAttribute('aria-pressed'),'false');
+      assert.equal(await page.locator('#wishlistSection').isVisible(),false);
+      assert.equal(await page.locator('#comparisonSection').isVisible(),false);
+      await page.evaluate(()=>{localStorage.removeItem('ss_wishlist');localStorage.removeItem('ss_compare');});
+    });
     await check('Product adds show saved size and quantity inline without interrupting keyboard use', async () => {
       await goto('product-detail.html?id=street');
       await page.evaluate(()=>localStorage.clear());

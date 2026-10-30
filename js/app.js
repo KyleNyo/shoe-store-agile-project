@@ -387,6 +387,7 @@ function renderCatalog() {
     }
 
     grid.innerHTML = list.map(card).join("");
+    updateShoppingButtons();
     grid.querySelectorAll('a[href^="product-detail.html"]').forEach(link => {
       const detail = new URL(link.href);
       const state = new URLSearchParams();
