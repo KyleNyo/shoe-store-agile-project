@@ -37,6 +37,49 @@ const server = http.createServer((req, res) => {
   const check = async(name, fn) => {await fn(); results.push(name); console.log('PASS ' + name);};
   const goto = file => page.goto(base + '/' + file);
   try {
+    await check('Invalid cart quantities block checkout until explicitly corrected', async () => {
+      await goto('cart.html');await page.evaluate(()=>localStorage.clear());
+      for (const [index,value] of ['0','','-1','1.5','100'].entries()) {
+        await page.evaluate(()=>{
+          localStorage.setItem('ss_user',JSON.stringify({name:'Quantity Test',email:'quantity@example.test'}));
+          localStorage.setItem('ss_cart',JSON.stringify([{id:'street',size:42,qty:1}]));
+        });
+        await goto('cart.html');
+        const saved=await page.evaluate(()=>localStorage.getItem('ss_cart'));
+        await page.locator('[data-qty="0"]').fill(value);
+        const checkout=page.getByRole('link',{name:'Proceed to Checkout',exact:true});
+        if(index%2===0) await checkout.click();
+        else {await checkout.focus();await page.keyboard.press('Enter');}
+        assert.match(page.url(),/cart\.html$/);
+        assert.equal(await page.locator('[data-qty="0"]').inputValue(),value);
+        assert.equal(await page.locator('[data-qty="0"]').getAttribute('aria-invalid'),'true');
+        assert.equal(await page.locator('[data-qty="0"]').evaluate(el=>el===document.activeElement),true);
+        assert.match(await page.locator('#cartMessage').innerText(),/whole number from 1 to 99/);
+        assert.equal(await page.evaluate(()=>localStorage.getItem('ss_cart')),saved);
+        await page.locator('[data-qty="0"]').fill('2');
+        await checkout.click();await page.waitForURL('**/checkout.html');
+        assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('ss_cart'))[0].qty),2);
+        assert.match(await page.locator('#checkoutSummary').innerText(),/129[.,]98/);
+      }
+      await page.evaluate(()=>localStorage.clear());
+    });
+    await check('Editing a second cart row cannot hide or bypass an invalid first row', async () => {
+      await goto('cart.html');
+      await page.evaluate(()=>{
+        localStorage.setItem('ss_cart',JSON.stringify([{id:'street',size:42,qty:1},{id:'street',size:43,qty:1}]));
+      });await page.reload();
+      await page.locator('[data-qty="0"]').fill('0');
+      await page.locator('[data-qty="1"]').fill('3');await page.locator('[data-qty="1"]').press('Tab');
+      assert.match(await page.locator('#cartMessage').innerText(),/whole number from 1 to 99/);
+      await page.getByRole('link',{name:'Proceed to Checkout',exact:true}).click();
+      assert.equal(await page.locator('[data-qty="0"]').evaluate(el=>el===document.activeElement),true);
+      assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('ss_cart'))),[{id:'street',size:42,qty:1},{id:'street',size:43,qty:3}]);
+      await page.locator('[data-qty="0"]').fill('2');await page.locator('[data-qty="0"]').press('Tab');
+      assert.equal(await page.locator('[aria-invalid="true"]').count(),0);
+      assert.equal(await page.locator('[data-qty="0"]').getAttribute('aria-describedby'),null);
+      assert.match(await page.locator('#cartMessage').innerText(),/Quantity updated/);
+      await page.evaluate(()=>localStorage.clear());
+    });
     await check('Cart product navigation retains the selected size and returns to the cart', async () => {
       await goto('cart.html');await page.evaluate(()=>localStorage.clear());
       await page.evaluate(()=>localStorage.setItem('ss_cart',JSON.stringify([{id:'street',size:43,qty:1}])));await page.reload();
@@ -546,7 +589,10 @@ const server = http.createServer((req, res) => {
       assert.match(await page.locator('.order-summary').innerText(),/259[.,]96/);
       for(const value of ['1.5','0','-1','100','']) {
         await page.locator('[data-qty="0"]').fill(value); await page.locator('[data-qty="0"]').press('Tab');
-        assert.equal(await page.locator('[data-qty="0"]').inputValue(),'3');
+        assert.equal(await page.locator('[data-qty="0"]').inputValue(),value);
+        assert.equal(await page.locator('[data-qty="0"]').getAttribute('aria-invalid'),'true');
+        assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('ss_cart'))[0].qty),3);
+        assert.match(await page.locator('.order-summary').innerText(),/259[.,]96/);
       }
       await page.locator('[data-remove="1"]').click();
       assert.equal(await page.locator('tbody tr').count(),1);

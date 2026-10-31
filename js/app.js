@@ -669,17 +669,34 @@ function renderCart() {
     return;
   }
 
-  el.innerHTML = `<p id="cartMessage" role="status" aria-live="polite"></p><div class="table-responsive"><table class="table align-middle"><thead><tr><th scope="col">Product</th><th scope="col">Size</th><th scope="col">Price</th><th scope="col">Quantity</th><th scope="col">Subtotal</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead><tbody>${rows.map((row, index) => `<tr><td><a href="product-detail.html?id=${row.id}&size=${row.size}&from=cart">${row.p.name}</a></td><td>${row.size}</td><td>${euro(row.p.price)}</td><td><input class="form-control cart-quantity" aria-label="Quantity for ${row.p.name}, size ${row.size}" type="number" min="1" max="${MAX_QUANTITY}" step="1" value="${row.qty}" data-qty="${index}"></td><td>${euro(subtotalCents(row) / 100)}</td><td><button class="btn btn-sm btn-outline-danger" aria-label="Remove ${row.p.name}, size ${row.size}" data-remove="${index}">Remove</button></td></tr>`).join("")}</tbody></table></div><div class="d-flex justify-content-end"><div class="order-summary cart-summary"><h5>Total: ${euro(totalPrice(rows))}</h5><a href="checkout.html" class="btn btn-primary w-100 mt-2">Proceed to Checkout</a></div></div>`;
+  el.innerHTML = `<p id="cartMessage" role="status" aria-live="polite" style="min-height: 1.5em"></p><div class="table-responsive"><table class="table align-middle"><thead><tr><th scope="col">Product</th><th scope="col">Size</th><th scope="col">Price</th><th scope="col">Quantity</th><th scope="col">Subtotal</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead><tbody>${rows.map((row, index) => `<tr><td><a href="product-detail.html?id=${row.id}&size=${row.size}&from=cart">${row.p.name}</a></td><td>${row.size}</td><td>${euro(row.p.price)}</td><td><input class="form-control cart-quantity" aria-label="Quantity for ${row.p.name}, size ${row.size}" type="number" min="1" max="${MAX_QUANTITY}" step="1" value="${row.qty}" data-qty="${index}"></td><td>${euro(subtotalCents(row) / 100)}</td><td><button class="btn btn-sm btn-outline-danger" aria-label="Remove ${row.p.name}, size ${row.size}" data-remove="${index}">Remove</button></td></tr>`).join("")}</tbody></table></div><div class="d-flex justify-content-end"><div class="order-summary cart-summary"><h5>Total: ${euro(totalPrice(rows))}</h5><a href="checkout.html" class="btn btn-primary w-100 mt-2">Proceed to Checkout</a></div></div>`;
 
+  const validateQuantity = input => {
+    const quantity = Number(input.value);
+    const valid = input.value.trim() !== "" && Number.isInteger(quantity) && quantity >= 1 && quantity <= MAX_QUANTITY;
+    input.classList.toggle("is-invalid", !valid);
+    if (valid) {
+      input.removeAttribute("aria-invalid");
+      input.removeAttribute("aria-describedby");
+    } else {
+      input.setAttribute("aria-invalid", "true");
+      input.setAttribute("aria-describedby", "cartMessage");
+      document.getElementById("cartMessage").textContent = `Enter a whole number from 1 to ${MAX_QUANTITY}.`;
+    }
+    return valid;
+  };
+  el.querySelector('.cart-summary a').onclick = event => {
+    const invalid = Array.from(el.querySelectorAll("[data-qty]")).filter(input => !validateQuantity(input));
+    if (invalid.length) {
+      event.preventDefault();
+      invalid[0].focus();
+    }
+  };
   el.querySelectorAll("[data-qty]").forEach(input => input.onchange = () => {
     const quantity = Number(input.value);
     const selected = rows[Number(input.dataset.qty)];
 
-    if (!Number.isInteger(quantity) || quantity < 1 || quantity > MAX_QUANTITY) {
-      input.value = selected.qty;
-      document.getElementById("cartMessage").textContent = `Enter a whole number from 1 to ${MAX_QUANTITY}.`;
-      return;
-    }
+    if (!validateQuantity(input)) return;
 
     const result = updateCartQuantity(selected.id, selected.size, selected.qty, quantity);
     if (result === "changed") {
@@ -698,6 +715,7 @@ function renderCart() {
     input.closest("tr").cells[4].textContent = euro(subtotalCents({ ...selected, qty: quantity }) / 100);
     el.querySelector(".cart-summary h5").textContent = `Total: ${euro(totalPrice(cartRows()))}`;
     document.getElementById("cartMessage").textContent = "Quantity updated.";
+    el.querySelectorAll('[aria-invalid="true"][data-qty]').forEach(validateQuantity);
     updateNav();
   });
 
