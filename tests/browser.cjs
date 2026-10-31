@@ -1039,6 +1039,7 @@ const server = http.createServer((req, res) => {
           window.restoreStorage=()=>{Storage.prototype.setItem=original;};
         },failedKey);
         await page.locator('#checkoutForm button').click();
+        await page.locator('#checkoutGuard').filter({hasText:'Your order could not be saved.'}).waitFor();
         assert.match(page.url(),/checkout.html$/);
         assert.match(await page.locator('#checkoutGuard').innerText(),/could not be saved/);
         assert.equal(await page.evaluate(()=>localStorage.getItem('ss_last_order')),previous);
