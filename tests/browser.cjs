@@ -37,6 +37,42 @@ const server = http.createServer((req, res) => {
   const check = async(name, fn) => {await fn(); results.push(name); console.log('PASS ' + name);};
   const goto = file => page.goto(base + '/' + file);
   try {
+    await check('Two queued checkout submissions create one order and reject the stale second tab', async () => {
+      const control=await context.newPage(), second=await context.newPage();
+      try {
+        await control.goto(base+'/cart.html');
+        await control.evaluate(()=>{
+          localStorage.clear();
+          localStorage.setItem('ss_user',JSON.stringify({name:'Queue Test',email:'queue@example.test'}));
+          localStorage.setItem('ss_cart',JSON.stringify([{id:'street',size:42,qty:2}]));
+          window.orderWrites=[];
+          window.addEventListener('storage',event=>{if(event.key==='ss_last_order')window.orderWrites.push(event.newValue);});
+        });
+        await control.evaluate(()=>new Promise(ready=>{
+          window.heldCheckout=navigator.locks.request('solestyle-checkout',()=>new Promise(release=>{window.releaseCheckout=release;ready();}));
+        }));
+        for(const tab of [page,second]) {
+          await tab.goto(base+'/checkout.html');
+          for(const [id,value] of [['address','Test Street 1'],['city','Berlin'],['postal','12345'],['cardNumber','1111222233334444']]) await tab.locator('#'+id).fill(value);
+          await tab.getByRole('button',{name:'Place Order',exact:true}).click();
+        }
+        await control.waitForFunction(async()=> (await navigator.locks.query()).pending.filter(lock=>lock.name==='solestyle-checkout').length===2);
+        await page.evaluate(()=>document.getElementById('checkoutForm').requestSubmit());
+        assert.equal(await control.evaluate(async()=> (await navigator.locks.query()).pending.filter(lock=>lock.name==='solestyle-checkout').length),2);
+        assert.equal(await page.getByRole('button',{name:'Place Order',exact:true}).isDisabled(),true);
+        assert.equal(await control.evaluate(()=>localStorage.getItem('ss_last_order')),null);
+        await control.evaluate(()=>window.releaseCheckout());
+        await page.waitForURL('**/confirmation.html');
+        await second.locator('#checkoutGuard').getByText(/Your cart has changed/).waitFor();
+        await control.waitForFunction(()=>window.orderWrites.length===1);
+        assert.equal(await control.evaluate(()=>window.orderWrites.length),1);
+        assert.deepEqual(await control.evaluate(()=>JSON.parse(localStorage.getItem('ss_cart'))),[]);
+        assert.equal(await control.evaluate(()=>JSON.parse(localStorage.getItem('ss_last_order')).total),129.98);
+      } finally {
+        await control.evaluate(()=>{window.releaseCheckout?.();localStorage.clear();});
+        await second.close();await control.close();
+      }
+    });
     await check('Invalid cart quantities block checkout until explicitly corrected', async () => {
       await goto('cart.html');await page.evaluate(()=>localStorage.clear());
       for (const [index,value] of ['0','','-1','1.5','100'].entries()) {
