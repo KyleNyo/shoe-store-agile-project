@@ -913,11 +913,8 @@ function initCheckout() {
     if (event.persisted) reviewedCheckoutIsCurrent();
   });
 
-  form.onsubmit = e => {
-    e.preventDefault();
-    submitted = true;
-
-    // Also check at submission, even if a storage event has not arrived yet.
+  const saveReviewedOrder = () => {
+    // Recheck after acquiring the lock: another checkout may have finished while waiting.
     if (!reviewedCheckoutIsCurrent()) return;
 
     if (!validate()) {
@@ -962,6 +959,42 @@ function initCheckout() {
     checkoutBlocked = true;
 
     location.href = "confirmation.html";
+  };
+  let checkoutPending = false;
+  form.onsubmit = e => {
+    e.preventDefault();
+    if (checkoutPending || checkoutBlocked) return;
+    submitted = true;
+    if (!reviewedCheckoutIsCurrent()) return;
+    if (!validate()) {
+      errorSummary.focus();
+      return;
+    }
+
+    // Older browsers keep the existing synchronous snapshot checks.
+    if (typeof navigator === "undefined" || !navigator.locks?.request) return saveReviewedOrder();
+
+    checkoutPending = true;
+    const button = document.querySelector("#checkoutForm button");
+    if (button) button.disabled = true;
+    form.setAttribute("aria-busy", "true");
+    guard.textContent = "Finishing your order. Please wait.";
+    guard.setAttribute("role", "status");
+    return Promise.resolve().then(() => navigator.locks.request("solestyle-checkout", () => {
+      if (checkoutBlocked) return;
+      guard.textContent = "";
+      saveReviewedOrder();
+    })).catch(() => {
+      if (checkoutBlocked) return;
+      guard.textContent = "Checkout could not start. No order was placed. Please try again.";
+      guard.setAttribute("role", "alert");
+      guard.setAttribute("tabindex", "-1");
+      guard.focus();
+    }).finally(() => {
+      checkoutPending = false;
+      form.removeAttribute("aria-busy");
+      if (button) button.disabled = checkoutBlocked;
+    });
   };
   // Keep native constraints as a fallback until the custom validator is installed.
   form.noValidate = true;

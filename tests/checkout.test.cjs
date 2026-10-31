@@ -35,6 +35,60 @@ function checkout() {
     submit: () => elements.checkoutForm.onsubmit({ preventDefault() {} }) };
 }
 
+test('queued checkout rechecks a cart changed before the lock is granted', async () => {
+  const app=checkout();
+  app.run(`globalThis.navigator={locks:{request:(name,callback)=>new Promise(resolve=>{
+    globalThis.releaseCheckout=()=>resolve(callback());
+  })}};`);
+  const pending=app.submit();await Promise.resolve();
+  app.set('ss_cart',[{id:'street',size:42,qty:3}]);
+  app.run('releaseCheckout()');await pending;
+  assert.equal(app.location.href,'checkout.html');
+  assert.match(app.elements.checkoutGuard.innerHTML,/cart has changed/);
+  assert.deepEqual(app.get('ss_last_order'),app.savedOrder);
+  assert.equal(app.get('ss_cart')[0].qty,3);
+});
+
+test('queued checkout rechecks an account switch before the lock is granted', async () => {
+  const app=checkout();
+  app.run(`globalThis.navigator={locks:{request:(name,callback)=>new Promise(resolve=>{
+    globalThis.releaseCheckout=()=>resolve(callback());
+  })}};`);
+  const pending=app.submit();await Promise.resolve();
+  app.set('ss_user',{name:'Other',email:'other@example.test'});
+  app.run('releaseCheckout()');await pending;
+  assert.match(app.elements.checkoutGuard.innerHTML,/account has changed/);
+  assert.deepEqual(app.get('ss_last_order'),app.savedOrder);
+  assert.equal(app.get('ss_cart')[0].qty,1);
+});
+
+test('repeated submits queue only one order and release the pending state', async () => {
+  const app=checkout();
+  app.run(`globalThis.requests=0;globalThis.navigator={locks:{request:(name,callback)=>{
+    requests++;return new Promise(resolve=>{globalThis.releaseCheckout=()=>resolve(callback());});
+  }}};`);
+  const pending=app.submit();app.submit();await Promise.resolve();
+  assert.equal(app.run('requests'),1);
+  assert.deepEqual(app.get('ss_last_order'),app.savedOrder);
+  app.run('releaseCheckout()');await pending;
+  assert.equal(app.location.href,'confirmation.html');
+  assert.deepEqual(app.get('ss_cart'),[]);
+  app.submit();assert.equal(app.run('requests'),1);
+});
+
+test('lock rejection preserves data and allows a successful retry', async () => {
+  const app=checkout();
+  app.run(`globalThis.navigator={locks:{request:()=>Promise.reject(new Error('Unavailable'))}};`);
+  await app.submit();
+  assert.match(app.elements.checkoutGuard.textContent,/No order was placed/);
+  assert.deepEqual(app.get('ss_last_order'),app.savedOrder);
+  assert.equal(app.get('ss_cart')[0].qty,1);
+  app.run('navigator.locks.request=(name,callback)=>Promise.resolve(callback())');
+  await app.submit();
+  assert.equal(app.location.href,'confirmation.html');
+  assert.deepEqual(app.get('ss_cart'),[]);
+});
+
 test('another-tab cart update blocks checkout before submission without writing an order', () => {
   const app = checkout();
   app.set('ss_cart', [{id:'street',size:43,qty:1}]);
@@ -86,6 +140,23 @@ test('restoring a completed checkout hides the finished form and cannot create a
 });
 
 for (const key of ['ss_last_order','ss_cart']) {
+  test(`locked checkout releases pending state after ${key} save failure`, async () => {
+    const app=checkout();
+    app.run(`globalThis.navigator={locks:{request:(name,callback)=>Promise.resolve(callback())}};
+      const originalWrite=localStorage.setItem;let failOnce=true;
+      localStorage.setItem=(key,value)=>{
+        if(key==='${key}' && failOnce){failOnce=false;throw new Error('Full');}
+        originalWrite(key,value);
+      };`);
+    await app.submit();
+    assert.equal(app.location.href,'checkout.html');
+    assert.deepEqual(app.get('ss_last_order'),app.savedOrder);
+    assert.equal(app.get('ss_cart')[0].qty,1);
+    assert.match(app.elements.checkoutGuard.textContent,/could not be saved/);
+    await app.submit();
+    assert.equal(app.location.href,'confirmation.html');
+    assert.deepEqual(app.get('ss_cart'),[]);
+  });
   test(`checkout preserves the cart and previous order if saving ${key} fails`, () => {
     const app = checkout();
     app.run(`const originalWrite = localStorage.setItem; let failOnce = true;
