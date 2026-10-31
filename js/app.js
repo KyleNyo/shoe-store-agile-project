@@ -24,6 +24,20 @@ const write = (k, v) => localStorage.setItem(k, JSON.stringify(v));
 const user = () => read("ss_user", null);
 const MAX_QUANTITY = 99;
 
+function validSavedOrder(order) {
+  return order && typeof order === "object" && typeof order.order === "string" &&
+    order.order.trim() && Number.isFinite(order.total) && order.total >= 0 &&
+    Number.isSafeInteger(Math.round(order.total * 100));
+}
+
+function savedOrders() {
+  const stored = read("ss_orders", []);
+  const orders = Array.isArray(stored) ? stored.filter(validSavedOrder) : [];
+  const latest = read("ss_last_order", null);
+  if (validSavedOrder(latest) && !orders.some(order => order.order === latest.order)) orders.unshift(latest);
+  return orders.filter((order, index) => orders.findIndex(item => item.order === order.order) === index).slice(0, 20);
+}
+
 function saveCart(items, onError = alert) {
   try {
     write("ss_cart", items);
@@ -922,7 +936,7 @@ function initCheckout() {
       return;
     }
 
-    const order = "SS" + Date.now().toString().slice(-8);
+    const order = "SS" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
 
     const items = c.map(row => ({
       name: row.p.name,
@@ -931,11 +945,18 @@ function initCheckout() {
       unitPriceCents: Math.round(row.p.price * 100)
     }));
     let previousOrder;
+    let previousHistory;
+    let historySaved = false;
     let orderSaved = false;
     try {
       previousOrder = localStorage.getItem("ss_last_order");
-      write("ss_last_order", { order, total, items });
+      previousHistory = localStorage.getItem("ss_orders");
+      const snapshot = { order, total, items, createdAt: new Date().toISOString() };
+      const history = [snapshot, ...savedOrders()].slice(0, 20);
+      write("ss_last_order", snapshot);
       orderSaved = true;
+      write("ss_orders", history);
+      historySaved = true;
       write("ss_cart", []);
     } catch {
       let recovered = !orderSaved;
@@ -945,6 +966,12 @@ function initCheckout() {
           else localStorage.setItem("ss_last_order", previousOrder);
           recovered = true;
         } catch { /* Storage can become unavailable during recovery as well. */ }
+      }
+      if (historySaved) {
+        try {
+          if (previousHistory === null) localStorage.removeItem("ss_orders");
+          else localStorage.setItem("ss_orders", previousHistory);
+        } catch { recovered = false; }
       }
       if (!recovered) {
         blockCheckout('Checkout could not finish saving, and the previous order record could not be restored. <a href="cart.html">Review your cart</a> before trying again.');
@@ -1004,12 +1031,11 @@ function renderConfirmation() {
   const el = document.getElementById("orderNumber");
   if (!el) return;
 
-  const o = read("ss_last_order", null);
+  const selected = new URLSearchParams(location.search).get("order");
+  const o = selected === null ? read("ss_last_order", null) : savedOrders().find(order => order.order === selected);
   const details = document.getElementById("confirmedItems");
   const printButton = document.getElementById("printOrder");
-  const validOrder = o && typeof o === "object" && typeof o.order === "string" &&
-    o.order.trim() && Number.isFinite(o.total) && o.total >= 0 &&
-    Number.isSafeInteger(Math.round(o.total * 100));
+  const validOrder = validSavedOrder(o);
 
   if (!validOrder) {
     document.getElementById("confirmationTitle").textContent = "No saved order";
@@ -1083,6 +1109,34 @@ function renderConfirmation() {
   printButton.after(downloadButton);
 }
 
+function renderOrderHistory() {
+  const area = document.getElementById("orderHistory");
+  if (!area) return;
+  const orders = savedOrders();
+  const list = document.createElement("ul");
+  list.className = "list-group text-start";
+  for (const order of orders) {
+    const row = document.createElement("li");
+    row.className = "list-group-item";
+    const link = document.createElement("a");
+    link.href = "confirmation.html?order=" + encodeURIComponent(order.order);
+    link.textContent = `Order ${order.order} — ${euro(order.total)}`;
+    row.append(link);
+    const date = new Date(order.createdAt);
+    if (order.createdAt && Number.isFinite(date.getTime())) {
+      const time = document.createElement("time");
+      time.dateTime = date.toISOString();
+      time.className = "d-block small text-muted";
+      time.textContent = date.toLocaleString();
+      row.append(time);
+    }
+    list.append(row);
+  }
+  area.replaceChildren();
+  if (orders.length) area.append(list);
+  else area.textContent = "No saved orders in this browser yet.";
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   initImageFallback();
   updateNav();
@@ -1098,4 +1152,9 @@ document.addEventListener("DOMContentLoaded", () => {
   initCartSync();
   initCheckout();
   renderConfirmation();
+  renderOrderHistory();
+  window.addEventListener("storage", event => {
+    if (event.storageArea === localStorage && [null, "ss_orders", "ss_last_order"].includes(event.key)) renderOrderHistory();
+  });
+  window.addEventListener("pageshow", event => { if (event.persisted) renderOrderHistory(); });
 });

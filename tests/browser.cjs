@@ -37,6 +37,36 @@ const server = http.createServer((req, res) => {
   const check = async(name, fn) => {await fn(); results.push(name); console.log('PASS ' + name);};
   const goto = file => page.goto(base + '/' + file);
   try {
+    await check('Order history opens older snapshots safely and leaves the latest order and cart unchanged', async () => {
+      await goto('confirmation.html');
+      const old={order:'old<&order',total:64.99,createdAt:'2026-10-01T12:00:00Z',items:[{name:'Old shoe',size:42,qty:1,unitPriceCents:6499}]};
+      const latest={order:'latest',total:1};
+      await page.evaluate(({old,latest})=>{
+        localStorage.clear();localStorage.setItem('ss_orders',JSON.stringify([latest,old]));
+        localStorage.setItem('ss_last_order',JSON.stringify(latest));
+        localStorage.setItem('ss_cart','[]');
+      },{old,latest});
+      await page.reload();
+      await page.locator('#orderHistory a').filter({hasText:old.order}).click();
+      await page.waitForFunction(id=>document.getElementById('orderNumber')?.textContent.includes(id),old.order);
+      assert.match(await page.locator('#orderNumber').innerText(),/old<&order/);
+      assert.match(await page.locator('#confirmedItems').innerText(),/Old shoe/);
+      assert.equal(await page.locator('#orderHistory img').count(),0);
+      const download=page.waitForEvent('download');await page.locator('#downloadOrder').click();
+      const file=await download;assert.match(fs.readFileSync(await file.path(),'utf8'),/Old shoe/);
+      assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('ss_last_order'))),latest);
+      assert.equal(await page.evaluate(()=>localStorage.getItem('ss_cart')),'[]');
+      await page.emulateMedia({media:'print'});
+      assert.equal(await page.locator('.order-history').isVisible(),false);
+      await page.emulateMedia({media:'screen'});
+      await goto('confirmation.html?order=missing');
+      assert.equal(await page.locator('#confirmationTitle').innerText(),'No saved order');
+      assert.equal(await page.locator('#printOrder').isVisible(),false);
+      assert.equal(await page.locator('#orderHistory a').count(),2);
+      await page.evaluate(()=>localStorage.clear());
+      await page.reload();
+      assert.match(await page.locator('#orderHistory').innerText(),/No saved orders/);
+    });
     await check('Two queued checkout submissions create one order and reject the stale second tab', async () => {
       const control=await context.newPage(), second=await context.newPage();
       try {
@@ -736,7 +766,9 @@ const server = http.createServer((req, res) => {
       assert.deepEqual(await page.locator('#confirmedItems tbody tr').nth(1).locator('td').allTextContents(),['Street Classic','43','1','€64.99','€64.99']);
       const before = await page.evaluate(()=>({order:localStorage.getItem('ss_last_order'),cart:localStorage.getItem('ss_cart')}));
       const order = JSON.parse(before.order);
-      assert.deepEqual(Object.keys(order).sort(),['items','order','total']);
+      assert.deepEqual(Object.keys(order).sort(),['createdAt','items','order','total']);
+      assert.equal(Number.isFinite(Date.parse(order.createdAt)),true);
+      assert.equal(await page.evaluate(id=>JSON.parse(localStorage.getItem('ss_orders'))[0].order===id,order.order),true);
       assert.deepEqual(Object.keys(order.items[0]).sort(),['name','qty','size','unitPriceCents']);
       await page.evaluate(()=>{window.printCalls=0;window.print=()=>window.printCalls++;});
       const print = page.getByRole('button',{name:'Print order summary',exact:true});

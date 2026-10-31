@@ -20,6 +20,12 @@ Sprint 2 implementation, defects, evidence and remaining delivery steps are desc
 
 ## Current delivery state
 
+### Order history follow-up — 31 October 2026
+
+The cart links to the order history below the confirmation summary. The latest 20 simulated orders are saved in this browser, including the previous last-order record when available. Open an entry to view, print or download its original item snapshot. The list is shared by this browser profile, not private to an account; no address, email or card fields are written into new order snapshots. Clearing browser storage removes the history. Checkout restores the previous history and latest order where possible if persistence fails; an unrecoverable storage failure blocks retry and asks the user to review the cart.
+
+The following baseline describes sprint closure, before this post-closure addition.
+
 The delivered application is on `main`. The final application baseline is `91cc88431cd09d023b15a002ba725a5bde2de4ba`, including merged PRs #20 and #21. It includes catalogue controls, wishlist/comparison/recently viewed products, cart recovery, checkout validation, printable/downloadable order summaries and protection against stale or concurrent checkout submissions.
 
 At this baseline, 40 unit tests and 54 Edge browser scenario groups passed. Chromium and Firefox checks passed on [merged main](https://github.com/KyleNyo/shoe-store-agile-project/actions/runs/41183593148). Sprint 3 closed on 31 October 2026 with no unfinished sprint issues. Follow-up features remain separate from the four-item, 17-point Sprint 2 accounting.

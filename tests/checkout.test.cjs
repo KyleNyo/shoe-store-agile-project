@@ -139,7 +139,7 @@ test('restoring a completed checkout hides the finished form and cannot create a
   assert.deepEqual(app.get('ss_cart'),[]);
 });
 
-for (const key of ['ss_last_order','ss_cart']) {
+for (const key of ['ss_last_order','ss_orders','ss_cart']) {
   test(`locked checkout releases pending state after ${key} save failure`, async () => {
     const app=checkout();
     app.run(`globalThis.navigator={locks:{request:(name,callback)=>Promise.resolve(callback())}};
@@ -159,6 +159,8 @@ for (const key of ['ss_last_order','ss_cart']) {
   });
   test(`checkout preserves the cart and previous order if saving ${key} fails`, () => {
     const app = checkout();
+    const history = [{order:'older',total:5}];
+    app.set('ss_orders',history);
     app.run(`const originalWrite = localStorage.setItem; let failOnce = true;
       localStorage.setItem = (key,value) => {
         if (key === '${key}' && failOnce) { failOnce = false; throw new Error('Full'); }
@@ -168,12 +170,32 @@ for (const key of ['ss_last_order','ss_cart']) {
     assert.equal(app.location.href,'checkout.html');
     assert.equal(app.get('ss_cart')[0].qty,1);
     assert.deepEqual(app.get('ss_last_order'),app.savedOrder);
+    assert.deepEqual(app.get('ss_orders'),history);
     assert.match(app.elements.checkoutGuard.textContent,/could not be saved/);
     app.submit();
     assert.equal(app.location.href,'confirmation.html');
     assert.deepEqual(app.get('ss_cart'),[]);
   });
 }
+
+test('checkout retains previous orders, limits history and stores no payment or address fields', () => {
+  const app=checkout();
+  app.set('ss_orders',Array.from({length:25},(_,i)=>({order:'old-'+i,total:i})));
+  app.submit();
+  const history=app.get('ss_orders');
+  assert.equal(history.length,20);
+  assert.deepEqual(history[0],app.get('ss_last_order'));
+  assert.equal(history[1].order,'previous');
+  assert.deepEqual(Object.keys(history[0]).sort(),['createdAt','items','order','total']);
+});
+
+test('malformed order history recovers while preserving the legacy last order', () => {
+  const app=checkout();
+  app.set('ss_orders',{broken:true});
+  app.submit();
+  assert.equal(app.get('ss_orders').length,2);
+  assert.deepEqual(app.get('ss_orders')[1],app.savedOrder);
+});
 
 test('failed checkout rollback blocks retry and reports the incomplete state', () => {
   const app=checkout();

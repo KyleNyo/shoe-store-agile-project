@@ -337,12 +337,14 @@ footer {
 .order-items { min-width:520px; }
 .order-items td { overflow-wrap:anywhere; }
 #orderNumber { overflow-wrap:anywhere; }
+.order-history a { overflow-wrap:anywhere; }
 @media print {
   @page { size:A4; margin:16mm; }
   body:has(#confirmationArea) { background:#fff; color:#000; }
   body:has(#confirmationArea) nav,
   body:has(#confirmationArea) footer,
   .confirmation-actions { display:none !important; }
+  .order-history { display:none !important; }
   body:has(#confirmationArea) section.container { width:100%; max-width:none; margin:0 !important; padding:0; }
   #confirmationArea { padding:0; background:#fff; }
   #confirmedItems { overflow:visible; }
