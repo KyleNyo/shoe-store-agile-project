@@ -814,8 +814,11 @@ const server = http.createServer((req, res) => {
       assert.match(await page.locator('#confirmedItems').innerText(),/Item details are unavailable/);
     });
     await check('Long order print layout repeats table headers and mobile confirmation does not overflow', async () => {
-      await page.evaluate(()=>localStorage.setItem('ss_last_order',JSON.stringify({order:'SS12345678',total:6499,items:Array.from({length:100},(_,i)=>({name:`Test shoe ${i+1}`,size:42,qty:1,unitPriceCents:6499}))})));
+      const longOrderId = 'SS' + '1234567890'.repeat(30);
+      await page.evaluate(order=>localStorage.setItem('ss_last_order',JSON.stringify({order,total:6499,items:Array.from({length:100},(_,i)=>({name:`Test shoe ${i+1}`,size:42,qty:1,unitPriceCents:6499}))})),longOrderId);
       await page.reload();
+      assert.equal(await page.getByRole('heading',{level:1,name:'Thank you for your order!'}).count(),1);
+      assert.equal(await page.locator('#orderNumber').innerText().then(text=>text.includes(longOrderId)),true);
       await page.setViewportSize({width:375,height:900});
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
       await page.emulateMedia({media:'print'});

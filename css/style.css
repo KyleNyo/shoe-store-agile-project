@@ -336,6 +336,7 @@ footer {
 .order-summary { background:var(--primary-light); border-radius:12px; padding:20px; }
 .order-items { min-width:520px; }
 .order-items td { overflow-wrap:anywhere; }
+#orderNumber { overflow-wrap:anywhere; }
 @media print {
   @page { size:A4; margin:16mm; }
   body:has(#confirmationArea) { background:#fff; color:#000; }
