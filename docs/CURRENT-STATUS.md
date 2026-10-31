@@ -1,5 +1,18 @@
 # Current project status
 
+Updated 31 October 2026.
+
+- Delivered application: `main`, verified application revision `91cc88431cd09d023b15a002ba725a5bde2de4ba`; PRs #20 and #21 are merged.
+- Verification: 40 passing unit tests, 54 passing Edge browser scenario groups, zero page errors; merged-main Chromium and Firefox checks passed in [run 41183593148](https://github.com/KyleNyo/shoe-store-agile-project/actions/runs/41183593148).
+- Sprint 3 closed on 31 October 2026 at 18:22 CET after the final Jira query found no unfinished sprint issues. SCRUM-35 and all 28 epic children are Done. Original issue ownership is preserved.
+- SCRUM-4 remains an unscoped legacy placeholder outside sprint commitments; it is not counted as delivered functionality.
+- [Final documentation and delivery navigation](https://shoe-store-agile.atlassian.net/wiki/spaces/~712020765d7f79f9f14cb5b73370d4875a46fd/pages/12550149) provides ten chapters, individual contribution evidence and sprint review/engineering reflection.
+- Course submission, instructor access and independent peer acceptance are not established by the test results.
+
+## Historical checkpoint — 17 October 2026
+
+The following branch names, counts and statuses describe the earlier checkpoint, not the final delivery above.
+
 Updated 17 October 2026.
 
 - Current presentation source: integrated-demo, including the SCRUM-39–41 quality improvements. Earlier snapshot: presentation-demo-2026-10-17.

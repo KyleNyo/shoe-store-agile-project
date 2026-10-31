@@ -1,5 +1,5 @@
-# shoe-store-agile-project
-E-commerce website developed using Scrum for IT Agile Development Retake Project
+# SoleStyle — Shoe Store
+E-commerce demonstration developed using Scrum for the IT Agile Development Retake Project.
 
 ## Run locally
 
@@ -20,6 +20,8 @@ Sprint 2 implementation, defects, evidence and remaining delivery steps are desc
 
 ## Current delivery state
 
-The `efe/presentation-integration` branch combines catalogue sorting/filter/reset, checkout validation, printable order summaries, stale-checkout protection and cart removal recovery. See [presentation instructions and verification](docs/PRESENTATION-CANDIDATE.md) and [Sprint 3 acceptance mapping](docs/SPRINT-3-ACCEPTANCE.md). These follow-up features remain separate from the four-item, 17-point Sprint 2 accounting.
+The delivered application is on `main`. The final application baseline is `91cc88431cd09d023b15a002ba725a5bde2de4ba`, including merged PRs #20 and #21. It includes catalogue controls, wishlist/comparison/recently viewed products, cart recovery, checkout validation, printable/downloadable order summaries and protection against stale or concurrent checkout submissions.
 
-`docs/CURRENT-STATUS.md` and earlier delivery notes preserve historical states; use the integrated demo document for this branch's current behavior and test results.
+At this baseline, 40 unit tests and 54 Edge browser scenario groups passed. Chromium and Firefox checks passed on [merged main](https://github.com/KyleNyo/shoe-store-agile-project/actions/runs/41183593148). Sprint 3 closed on 31 October 2026 with no unfinished sprint issues. Follow-up features remain separate from the four-item, 17-point Sprint 2 accounting.
+
+Use the [final ten-chapter documentation](https://shoe-store-agile.atlassian.net/wiki/spaces/~712020765d7f79f9f14cb5b73370d4875a46fd/pages/12550149) for requirements, architecture, individual contributions, verification and sprint closure. [Current status](docs/CURRENT-STATUS.md) distinguishes final delivery from older checkpoints. Earlier candidate/demo documents are dated historical records.
